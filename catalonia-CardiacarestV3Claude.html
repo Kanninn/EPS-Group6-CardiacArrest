@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Group 6, Cardiacarest Catalonia — v3</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:#0f0f0f; --surface:#171717; --surface2:#1f1f1f;
+  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.14);
+  --text:#e8e6e0; --muted:#7a7870;
+  --accent:#c8f04a; --accent2:#a4cc35;
+  --male:#60a5fa; --male-glow:rgba(96,165,250,0.35);
+  --female:#f472b6; --female-glow:rgba(244,114,182,0.35);
+  --all:#c8f04a; --all-glow:rgba(200,240,74,0.35);
+  --amber:#ffb340;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;z-index:200;}
+.logo{display:flex;align-items:baseline;gap:10px;}
+.logo-mark{font-family:'DM Serif Display',serif;font-size:21px;color:var(--accent);letter-spacing:-0.5px;}
+.logo-sub{font-size:11px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;}
+.stack-pills{display:flex;gap:6px;}
+.pill{font-family:'DM Mono',monospace;font-size:10px;padding:3px 8px;border-radius:20px;border:1px solid var(--border2);color:var(--muted);letter-spacing:0.04em;}
+.pill.on{border-color:var(--accent);color:var(--accent);}
+
+.main{display:flex;flex:1;overflow:hidden;}
+
+/* Sidebar */
+.sidebar{width:310px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;}
+.sb-scroll{flex:1;overflow-y:auto;}
+.sb-scroll::-webkit-scrollbar{width:3px;}
+.sb-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+.section{padding:15px 16px;border-bottom:1px solid var(--border);}
+.sec-label{font-size:10px;letter-spacing:0.13em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.sec-label span{background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:1px 5px;font-size:9px;}
+
+/* Upload */
+.upload-zone{border:1.5px dashed var(--border2);border-radius:8px;padding:14px 12px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;margin-bottom:6px;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(200,240,74,0.04);}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-icon{width:26px;height:26px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;margin:0 auto 7px;border:1px solid var(--border2);}
+.upload-icon svg{width:13px;height:13px;stroke:var(--muted);}
+.upload-text{font-size:11px;color:var(--muted);line-height:1.5;}
+.upload-text strong{color:var(--text);font-weight:500;}
+.file-loaded{background:rgba(200,240,74,0.06);border:1px solid rgba(200,240,74,0.2);border-radius:7px;padding:8px 11px;font-size:11px;display:flex;align-items:center;gap:7px;font-family:'DM Mono',monospace;}
+.file-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;flex-shrink:0;}
+
+/* ── Gender filter buttons ── */
+.gender-buttons{display:flex;gap:6px;}
+.gbtn{flex:1;padding:8px 4px;border-radius:7px;border:1px solid var(--border2);background:var(--surface2);font-size:12px;font-weight:500;font-family:'Instrument Sans',sans-serif;cursor:pointer;transition:all 0.18s;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;}
+.gbtn .gbtn-dot{width:8px;height:8px;border-radius:50%;margin-bottom:1px;transition:all 0.18s;}
+.gbtn-all .gbtn-dot{background:var(--all);}
+.gbtn-male .gbtn-dot{background:var(--male);}
+.gbtn-female .gbtn-dot{background:var(--female);}
+.gbtn.sel{color:var(--text);}
+.gbtn-all.sel{border-color:var(--all);background:rgba(200,240,74,0.07);color:var(--all);}
+.gbtn-male.sel{border-color:var(--male);background:rgba(96,165,250,0.07);color:var(--male);}
+.gbtn-female.sel{border-color:var(--female);background:rgba(244,114,182,0.07);color:var(--female);}
+.gender-counts{display:flex;gap:10px;margin-top:8px;}
+.gc{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px;}
+.gc-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* ── Date slider ── */
+.date-slider-wrap{position:relative;}
+.date-display{font-family:'DM Mono',monospace;font-size:13px;color:var(--text);text-align:center;margin-bottom:8px;letter-spacing:0.04em;}
+.date-display span{color:var(--accent);}
+input[type=range].date-slider{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:var(--border2);outline:none;cursor:pointer;}
+input[type=range].date-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 6px var(--all-glow);}
+input[type=range].date-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg);}
+.date-range-labels{display:flex;justify-content:space-between;margin-top:4px;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);}
+.date-mode-row{display:flex;gap:6px;margin-top:10px;}
+.dmbtn{flex:1;padding:5px;border-radius:6px;border:1px solid var(--border2);background:var(--surface2);font-size:10px;font-family:'Instrument Sans',sans-serif;cursor:pointer;transition:all 0.18s;color:var(--muted);}
+.dmbtn.sel{border-color:var(--accent);color:var(--accent);background:rgba(200,240,74,0.07);}
+.date-no-data{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;padding:4px 0;}
+
+/* Results list */
+.results-list{padding:0;}
+.result-item{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s;}
+.result-item:hover{background:var(--surface2);}
+.r-dot-wrap{width:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.r-dot{border-radius:50%;}
+.r-name{font-size:12px;font-weight:500;flex:1;}
+.r-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;}
+.r-bar-wrap{width:40px;height:3px;background:var(--border2);border-radius:2px;overflow:hidden;}
+.r-bar{height:100%;border-radius:2px;}
+
+/* Stats bar */
+.stats-bar{padding:9px 16px;border-top:1px solid var(--border);display:flex;gap:14px;flex-shrink:0;}
+.stat{display:flex;flex-direction:column;gap:1px;}
+.stat-val{font-family:'DM Serif Display',serif;font-size:17px;color:var(--accent);line-height:1;}
+.stat-lab{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.09em;}
+
+/* Map */
+
+/* Dette er bakrunnen altså over basic kartet*/
+#map{flex:1;background:#0a0a0a;}
+.leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(0.38) contrast(1.1);}
+.leaflet-control-zoom{border:1px solid var(--border2) !important;background:var(--surface) !important;}
+.leaflet-control-zoom a{background:var(--surface) !important;color:var(--text) !important;border-color:var(--border2) !important;}
+.leaflet-control-zoom a:hover{background:var(--surface2) !important;color:var(--accent) !important;}
+.leaflet-control-attribution{display:none;}
+
+/* Popup */
+.city-popup{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,0.6);}
+.city-popup h3{font-family:'DM Serif Display',serif;font-size:15px;margin-bottom:4px;}
+.city-popup p{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;line-height:1.7;}
+.leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0;}
+.leaflet-popup-content{margin:0;}
+.leaflet-popup-tip-container{display:none;}
+
+/* Map legend overlay */
+.map-legend{position:absolute;bottom:16px;left:326px;z-index:500;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:10px 13px;font-size:11px;color:var(--muted);display:none;}
+.leg-title{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:7px;color:var(--text);}
+.leg-row{display:flex;align-items:center;gap:7px;margin-bottom:4px;}
+.leg-dot{border-radius:50%;flex-shrink:0;}
+
+/* Shapefile */
+.shp-zone{border:1.5px dashed var(--border2);border-radius:7px;padding:10px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;}
+.shp-zone:hover,.shp-zone.drag{border-color:var(--accent);background:rgba(200,240,74,0.03);}
+.shp-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.shp-zone p{font-size:11px;color:var(--muted);line-height:1.5;}
+.shp-zone strong{color:var(--text);font-weight:500;}
+.shp-status{font-size:10px;color:var(--muted);margin-top:5px;font-family:'DM Mono',monospace;}
+.shp-status.ok{color:var(--accent);}
+.shp-controls{margin-top:8px;display:none;}
+.col-row{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+.col-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;min-width:72px;}
+
+/* Toast */
+.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border2);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text);transform:translateY(60px);opacity:0;transition:all 0.3s cubic-bezier(.16,1,.3,1);z-index:9999;pointer-events:none;max-width:250px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.tv{font-weight:600;color:var(--accent);}
+
+/* Misc */
+.btn-sm{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;font-size:11px;color:var(--muted);cursor:pointer;font-family:'Instrument Sans',sans-serif;transition:all 0.18s;width:100%;}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-mark">EPS-Group6</span>
+    <span class="logo-sub">Catalonia-Cardicarest</span>
+  </div>
+  <div class="stack-pills">
+    <span class="pill on">PostGIS</span>
+    <span class="pill on">Leaflet</span>
+    <span class="pill on">OSM</span>
+    <!--<span class="pill">QGIS</span> -->
+  </div>
+</header>
+
+<div class="main">
+<div class="sidebar">
+<div class="sb-scroll">
+
+  <!-- ══ 01 DATASET ══ -->
+  <div class="section">
+    <div class="sec-label">01 — Dataset <span>col P = city · col B = gender · col C = date</span></div>
+    <div class="upload-zone" id="dropzone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+        </svg>
+      </div>
+      <div class="upload-text"><strong>Upload dataset</strong><br>Excel or CSV — ~5 000 rows</div>
+    </div>
+    <div id="fileStatus" style="display:none" class="file-loaded">
+      <div class="file-dot"></div><span id="fileStatusText"></span>
+    </div>
+    <div style="margin-top:7px">
+      <button class="btn-sm" onclick="loadSampleData()">Load sample dataset</button>
+    </div>
+  </div>
+
+  <!-- ══ 02 GENDER FILTER ══ -->
+  <div class="section">
+    <div class="sec-label">02 — Gender Filter <span>col B</span></div>
+    <div class="gender-buttons">
+      <button class="gbtn gbtn-all sel" id="gbtn-all" onclick="setGender('all')">
+        <div class="gbtn-dot"></div>All
+      </button>
+      <button class="gbtn gbtn-male" id="gbtn-male" onclick="setGender('Male')">
+        <div class="gbtn-dot"></div>Male
+      </button>
+      <button class="gbtn gbtn-female" id="gbtn-female" onclick="setGender('Female')">
+        <div class="gbtn-dot"></div>Female
+      </button>
+    </div>
+    <div class="gender-counts" id="genderCounts" style="display:none">
+      <div class="gc"><div class="gc-dot" style="background:var(--male)"></div><span id="gcMale">0 male</span></div>
+      <div class="gc"><div class="gc-dot" style="background:var(--female)"></div><span id="gcFemale">0 female</span></div>
+    </div>
+  </div>
+
+  <!-- ══ 03 DATE FILTER ══ -->
+  <div class="section">
+    <div class="sec-label">03 — Date Filter <span>col C</span></div>
+    <div id="dateSliderWrap" style="display:none">
+      <!-- Mode: exact day vs. cumulative up-to -->
+      <div class="date-mode-row">
+        <button class="dmbtn sel" id="dm-exact" onclick="setDateMode('exact')">Exact day</button>
+        <button class="dmbtn" id="dm-cumul" onclick="setDateMode('cumulative')">Up to date</button>
+        <button class="dmbtn" id="dm-all"   onclick="setDateMode('all')">All dates</button>
+      </div>
+      <div style="margin-top:10px">
+        <div class="date-display" id="dateDisplay"><span id="dateVal">—</span></div>
+        <input type="range" class="date-slider" id="dateSlider" min="0" value="0" oninput="onDateSlide()">
+        <div class="date-range-labels">
+          <span id="dateMin">—</span><span id="dateMax">—</span>
+        </div>
+      </div>
+      <div style="margin-top:6px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)" id="dateRowCount"></div>
+    </div>
+    <div id="dateNoData" class="date-no-data">Load a dataset to enable date filtering.</div>
+  </div>
+
+  <!-- ══ 04 DOT SIZE ══ -->
+  <div class="section">
+    <div class="sec-label">04 — Dot Size</div>
+    <div class="col-row">
+      <span class="col-label">Min size</span>
+      <input type="range" id="dotMin" min="4" max="14" value="6" style="flex:1" oninput="renderMap()">
+      <span id="dotMinVal" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:20px;text-align:right">6</span>
+    </div>
+    <div class="col-row" style="margin-bottom:0">
+      <span class="col-label">Max size</span>
+      <input type="range" id="dotMax" min="14" max="54" value="30" style="flex:1" oninput="renderMap()">
+      <span id="dotMaxVal" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:20px;text-align:right">30</span>
+    </div>
+  </div>
+
+  <!-- ══ 05 BOUNDARY LAYER ══ -->
+  <div class="section">
+    <div class="sec-label">05 — Boundary Layer <span>GeoJSON</span></div>
+    <div class="shp-zone" id="shpDropzone">
+      <input type="file" id="shpInput" accept=".geojson,.json">
+      <p><strong>Drop GeoJSON boundary</strong><br>Municipality / comarca borders<br><span style="font-size:10px">Export from QGIS or: ogr2ogr -f GeoJSON out.geojson in.shp</span></p>
+    </div>
+    <div id="shpStatus" class="shp-status"></div>
+    <div class="shp-controls" id="shpControls">
+      <div class="col-row" style="margin-top:6px">
+        <span class="col-label">Fill opacity</span>
+        <input type="range" id="shpFillOpacity" min="0" max="50" value="8" style="flex:1" oninput="updateShpStyle()">
+        <span id="shpFillVal" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:24px;text-align:right">8%</span>
+      </div>
+      <div class="col-row" style="margin-bottom:0">
+        <span class="col-label">Border</span>
+        <input type="color" id="shpColor" value="#c8f04a" style="width:28px;height:22px;background:none;border:1px solid var(--border2);border-radius:4px;cursor:pointer" oninput="updateShpStyle()">
+        <button onclick="removeShapefile()" style="flex:1;background:transparent;border:1px solid var(--border2);border-radius:5px;padding:3px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:'Instrument Sans',sans-serif;margin-left:4px" onmouseover="this.style.borderColor='#ff5e57';this.style.color='#ff5e57'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">Remove layer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 06 CITY LIST ══ -->
+  <div class="section" style="padding-bottom:6px">
+    <div class="sec-label">06 — Results <span id="listLabel">—</span></div>
+  </div>
+  <div class="results-list" id="resultsList">
+    <div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7">
+      Upload a dataset to see results.
+    </div>
+  </div>
+
+</div><!-- /sb-scroll -->
+<div class="stats-bar" id="statsBar" style="display:none">
+  <div class="stat"><div class="stat-val" id="statRows">0</div><div class="stat-lab">Visible rows</div></div>
+  <div class="stat"><div class="stat-val" id="statCities">0</div><div class="stat-lab">Cities shown</div></div>
+  <div class="stat"><div class="stat-val" id="statMapped">0</div><div class="stat-lab">Mapped</div></div>
+</div>
+</div><!-- /sidebar -->
+
+<div id="map"></div>
+</div><!-- /main -->
+
+<div class="map-legend" id="mapLegend">
+  <div class="leg-title" id="legTitle">Frequency</div>
+  <div id="legRows"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// GeoData Catalonia v3
+// Fixed columns: P = city/municipality, B = gender, C = date
+// PostGIS equivalent query (production):
+//   SELECT p.name, COUNT(*) as freq,
+//          ST_X(p.geom) lon, ST_Y(p.geom) lat
+//   FROM records r
+//   JOIN municipalities p ON r.municipality = p.name
+//   WHERE (r.gender = :gender OR :gender = 'all')
+//     AND (:dateMode = 'all'
+//          OR (:dateMode = 'exact'    AND r.date::date = :date)
+//          OR (:dateMode = 'cumulative' AND r.date::date <= :date))
+//     AND ST_Within(p.geom, catalonia_boundary)
+//   GROUP BY p.name, p.geom
+// ════════════════════════════════════════════════════════════════
+
+// ── OSM/Nominatim coordinate dictionary
+const CITY_COORDS = {
+  'barcelona':[41.3851,2.1734],'girona':[41.9794,2.8214],
+  'lleida':[41.6176,0.6200],'tarragona':[41.1181,1.2445],
+  'manresa':[41.7284,1.8234],'mataro':[41.5396,2.4453],
+  'sabadell':[41.5431,2.1095],'terrassa':[41.5634,2.0094],
+  'badalona':[41.4500,2.2470],'hospitalet de llobregat':[41.3596,2.1000],
+  'mollet del valles':[41.5370,2.2125],'molins de rei':[41.4129,2.0210],
+  'montcada i reixac':[41.4887,2.1867],'martorell':[41.4726,1.9318],
+  'masnou':[41.4792,2.3177],'malgrat de mar':[41.6475,2.7425],
+  'montgat':[41.4660,2.2806],'mollerussa':[41.6258,0.8930],
+  'montblanc':[41.3789,1.1592],'manlleu':[41.9813,2.2851],
+  'cambrils':[41.0657,1.0588],'reus':[41.1561,1.1065],
+  'valls':[41.2874,1.2529],'igualada':[41.5793,1.6169],
+  'vilanova i la geltru':[41.2244,1.7257],'vic':[41.9299,2.2548],
+  'berga':[41.9993,1.8431],'solsona':[41.9962,1.5162],
+  'tremp':[42.1673,0.8997],"la seu d'urgell":[42.3582,1.4583],
+  'puigcerda':[42.4319,1.9300],'ripoll':[42.2030,2.1932],
+  'olot':[42.1827,2.4907],'figueres':[42.2674,2.9625],
+  'blanes':[41.6735,2.7936],'lloret de mar':[41.6942,2.8416],
+  'roses':[42.2677,3.1770],'sitges':[41.2352,1.8096],
+  'premia de mar':[41.4929,2.3593],'pineda de mar':[41.6290,2.6814],
+  'sant feliu de guixols':[41.7826,3.0313],'palamos':[41.8478,3.1295],
+  "l'escala":[42.1238,3.1333],'mora d\'ebre':[41.0900,0.6300],
+  'amposta':[40.7065,0.5811],'tortosa':[40.8120,0.5211],
+  'gandesa':[41.0536,0.4457],'la bisbal d\'emporda':[41.9607,3.0358],
+  'palafrugell':[41.9072,3.1624],'cardona':[41.9224,1.6798],
+  'banyoles':[42.1185,2.7590],'besalu':[42.2002,2.7001],
+  'camprodon':[42.3185,2.3700],'sallent':[41.8240,1.8914],
+  'navas':[42.0461,1.8936],'cornella de llobregat':[41.3550,2.0720],
+  'viladecans':[41.3162,2.0201],'gava':[41.3014,2.0038],
+  'castelldefels':[41.2743,1.9766],'sant boi de llobregat':[41.3472,2.0359],
+  'el prat de llobregat':[41.3261,2.0956],'vilafranca del penedes':[41.3437,1.7005],
+  'el vendrell':[41.2177,1.5354],'calafell':[41.1939,1.5733],
+  'salou':[41.0718,1.1403],'tossa de mar':[41.7220,2.9358],
+  'santa coloma de farners':[41.8589,2.6737],'sant sadurni d\'anoia':[41.4261,1.7862],
+};
+
+// ── Normalise for lookup (strip accents, lowercase, trim)
+function norm(s) {
+  if (!s) return '';
+  return String(s).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ').trim();
+}
+
+function lookupCoords(name) {
+  const n = norm(name);
+  if (CITY_COORDS[n]) return CITY_COORDS[n];
+  for (const [k,v] of Object.entries(CITY_COORDS)) {
+    if (k === n || k.startsWith(n) || n.startsWith(k)) return v;
+  }
+  return null;
+}
+
+// ── Parse date string "2022-01-01 00:00:00" → JS Date (day only, UTC noon)
+function parseDate(s) {
+  if (!s) return null;
+  const str = String(s).trim();
+  // Handles "2022-01-01 00:00:00", "2022-01-01T00:00:00", "2022-01-01"
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return new Date(Date.UTC(+m[1], +m[2]-1, +m[3], 12, 0, 0));
+}
+
+function dateToKey(d) {
+  // "YYYY-MM-DD" string key
+  if (!d) return null;
+  return d.toISOString().slice(0,10);
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return d.toISOString().slice(0,10);
+}
+
+// ── Map init
+const map = L.map('map',{center:[41.7,1.7],zoom:8,zoomControl:true,attributionControl:false});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+
+// Catalonia outline
+const catPoly=[[42.848,0.72],[42.82,1.45],[42.75,1.75],[42.55,2.10],[42.45,2.65],[42.35,2.95],[42.18,3.10],[41.95,3.22],[41.70,3.15],[41.50,2.85],[41.35,2.65],[41.25,2.30],[41.10,1.90],[40.85,1.35],[40.70,0.85],[40.65,0.50],[40.72,0.30],[40.85,0.18],[41.10,0.15],[41.35,0.28],[41.55,0.42],[41.75,0.58],[41.95,0.65],[42.20,0.70],[42.50,0.72],[42.72,0.72]];
+L.polygon(catPoly,{stroke:true,color:'rgba(200,240,74,0.2)',weight:1.2,fillColor:'rgba(200,240,74,0.02)',fillOpacity:1}).addTo(map);
+
+// ── State
+let rawData = [];
+let allDates = [];       // sorted unique Date objects from col C
+let genderFilter = 'all';
+let dateMode = 'all';    // 'all' | 'exact' | 'cumulative'
+let dateIdx = 0;         // index into allDates array
+let markers = [];
+let shpLayer = null;
+
+// ── Dot color per gender filter
+function dotColor() {
+  if (genderFilter === 'Male')   return { main:'#60a5fa', glow:'rgba(96,165,250,0.35)' };
+  if (genderFilter === 'Female') return { main:'#f472b6', glow:'rgba(244,114,182,0.35)' };
+  return { main:'#c8f04a', glow:'rgba(200,240,74,0.35)' };
+}
+
+// ── Gender button selection
+function setGender(g) {
+  genderFilter = g;
+  ['all','Male','Female'].forEach(v => {
+    const el = document.getElementById('gbtn-' + v.toLowerCase());
+    if (el) el.classList.toggle('sel', v === g || (v === 'all' && g === 'all'));
+  });
+  renderMap();
+}
+
+// ── Date mode
+function setDateMode(m) {
+  dateMode = m;
+  ['exact','cumul','all'].forEach(id => {
+    document.getElementById('dm-'+id).classList.toggle('sel', id === m || (id === 'all' && m === 'all'));
+  });
+  updateDateDisplay();
+  renderMap();
+}
+
+function onDateSlide() {
+  dateIdx = parseInt(document.getElementById('dateSlider').value);
+  updateDateDisplay();
+  renderMap();
+}
+
+function updateDateDisplay() {
+  if (!allDates.length) return;
+  const d = allDates[dateIdx];
+  const label = dateMode === 'all' ? 'All dates' :
+                dateMode === 'cumulative' ? `Up to ${fmtDate(d)}` :
+                fmtDate(d);
+  document.getElementById('dateVal').textContent = label;
+  document.getElementById('dateSlider').disabled = (dateMode === 'all');
+}
+
+// ── Filter rawData by current gender + date settings
+function getFilteredRows() {
+  return rawData.filter(row => {
+    // Gender filter (col B)
+    if (genderFilter !== 'all') {
+      const g = String(row.B || '').trim();
+      if (g !== genderFilter) return false;
+    }
+    // Date filter (col C)
+    if (dateMode !== 'all' && allDates.length) {
+      const rowDate = row._date;
+      if (!rowDate) return false;
+      const pivot = allDates[dateIdx];
+      if (dateMode === 'exact')      { if (dateToKey(rowDate) !== dateToKey(pivot)) return false; }
+      if (dateMode === 'cumulative') { if (rowDate > pivot) return false; }
+    }
+    return true;
+  });
+}
+
+// ── Build frequency map from a set of rows
+function buildFreq(rows) {
+  const freq = {};
+  rows.forEach(row => {
+    const name = String(row.P || '').trim();
+    if (!name || name.length < 2) return;
+    const key = norm(name);
+    if (!freq[key]) freq[key] = { count:0, displayName:name, coords: lookupCoords(name), male:0, female:0 };
+    freq[key].count++;
+    const g = String(row.B || '').trim();
+    if (g === 'Male')   freq[key].male++;
+    if (g === 'Female') freq[key].female++;
+  });
+  return freq;
+}
+
+// ── Main parse
+function parseFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if (!rows.length) { toast('File appears empty.'); return; }
+
+      // Map column letters — row 0 is the header
+      const header = rows[0];
+      const colLetters = header.map((_,i) => {
+        const n = i + 1;
+        return n <= 26
+          ? String.fromCharCode(64+n)
+          : String.fromCharCode(64+Math.floor((n-1)/26)) + String.fromCharCode(64+((n-1)%26)+1);
+      });
+
+      rawData = rows.slice(1).map(row => {
+        const obj = {};
+        row.forEach((val,i) => { obj[colLetters[i]] = val; });
+        obj._date = parseDate(obj.C);
+        return obj;
+      });
+
+      // Build sorted unique dates
+      const dateSet = {};
+      rawData.forEach(r => { if (r._date) dateSet[dateToKey(r._date)] = r._date; });
+      allDates = Object.values(dateSet).sort((a,b) => a-b);
+
+      initDateSlider();
+
+      document.getElementById('fileStatus').style.display = 'flex';
+      document.getElementById('fileStatusText').textContent =
+        `${rawData.length} rows · ${header.length} cols · ${file.name}`;
+
+      // Gender counts
+      let male = 0, female = 0;
+      rawData.forEach(r => {
+        const g = String(r.B||'').trim();
+        if (g === 'Male') male++;
+        if (g === 'Female') female++;
+      });
+      document.getElementById('gcMale').textContent = male.toLocaleString() + ' male';
+      document.getElementById('gcFemale').textContent = female.toLocaleString() + ' female';
+      document.getElementById('genderCounts').style.display = 'flex';
+
+      toast(`Loaded <span class="tv">${rawData.length.toLocaleString()}</span> rows — ${allDates.length} unique dates`);
+      renderMap();
+    } catch(err) {
+      toast('Error reading file: ' + err.message);
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function initDateSlider() {
+  const wrap = document.getElementById('dateSliderWrap');
+  const noData = document.getElementById('dateNoData');
+  if (!allDates.length) {
+    wrap.style.display = 'none';
+    noData.style.display = 'block';
+    noData.textContent = 'No valid dates found in column C.';
+    return;
+  }
+  wrap.style.display = 'block';
+  noData.style.display = 'none';
+  const slider = document.getElementById('dateSlider');
+  slider.max = allDates.length - 1;
+  slider.value = allDates.length - 1;
+  dateIdx = allDates.length - 1;
+  document.getElementById('dateMin').textContent = fmtDate(allDates[0]);
+  document.getElementById('dateMax').textContent = fmtDate(allDates[allDates.length-1]);
+  updateDateDisplay();
+}
+
+// ── Render markers
+function renderMap() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+
+  // Update size display
+  document.getElementById('dotMinVal').textContent = document.getElementById('dotMin').value;
+  document.getElementById('dotMaxVal').textContent = document.getElementById('dotMax').value;
+
+  const filtered = getFilteredRows();
+  const freq = buildFreq(filtered);
+  const cities = Object.values(freq);
+
+  const counts = cities.map(c => c.count);
+  const maxCount = Math.max(...counts, 1);
+  const minCount = Math.min(...counts, 1);
+  const minPx = parseInt(document.getElementById('dotMin').value);
+  const maxPx = parseInt(document.getElementById('dotMax').value);
+  const color = dotColor();
+
+  function dotSz(count) {
+    if (maxCount === minCount) return (minPx + maxPx) / 2;
+    // sqrt scaling: prevents one dominant city drowning out the rest
+    const t = Math.sqrt((count - minCount) / (maxCount - minCount));
+    return minPx + t * (maxPx - minPx);
+  }
+
+  cities.forEach(city => {
+    if (!city.coords) return;
+    const sz = dotSz(city.count);
+    const icon = L.divIcon({
+      html: `<div style="
+        width:${sz}px;height:${sz}px;
+        background:${color.main};
+        border-radius:50%;
+        border:1.5px solid rgba(0,0,0,0.45);
+        box-shadow:0 0 ${Math.round(sz*0.8)}px ${color.glow};
+        opacity:0.88;
+        cursor:pointer;
+        transition:transform 0.12s;
+      " onmouseover="this.style.transform='scale(1.25)';this.style.opacity='1'"
+         onmouseout="this.style.transform='';this.style.opacity='0.88'"></div>`,
+      className:'', iconSize:[sz,sz], iconAnchor:[sz/2,sz/2],
+    });
+    const gLabel = genderFilter === 'all'
+      ? `<span style="color:#60a5fa">${city.male}M</span> / <span style="color:#f472b6">${city.female}F</span>`
+      : `${city.count} ${genderFilter}`;
+    const dateLabel = dateMode === 'all' ? 'All dates' :
+                      dateMode === 'exact' ? fmtDate(allDates[dateIdx]) :
+                      `Up to ${fmtDate(allDates[dateIdx])}`;
+    const m = L.marker(city.coords,{icon})
+      .addTo(map)
+      .bindPopup(`<div class="city-popup">
+        <h3 style="color:${color.main}">${city.displayName}</h3>
+        <p>Mentions: <strong style="color:${color.main}">${city.count}</strong><br>
+        Gender: ${gLabel}<br>
+        Date: ${dateLabel}<br>
+        <span style="opacity:0.5">${city.coords[0].toFixed(4)}°N ${city.coords[1].toFixed(4)}°E</span></p>
+      </div>`,{closeButton:false});
+    markers.push(m);
+  });
+
+  // Sidebar list
+  const sorted = cities.sort((a,b) => b.count - a.count);
+  const mapped = sorted.filter(c => c.coords).length;
+
+  document.getElementById('statsBar').style.display = 'flex';
+  document.getElementById('statRows').textContent = filtered.length.toLocaleString();
+  document.getElementById('statCities').textContent = sorted.length;
+  document.getElementById('statMapped').textContent = mapped;
+  document.getElementById('listLabel').textContent = sorted.length + ' cities';
+
+  document.getElementById('resultsList').innerHTML = sorted.length ? sorted.map(c => {
+    const sz = 4 + Math.round((c.count / maxCount) * 10);
+    const pct = Math.round(c.count / maxCount * 100);
+    return `<div class="result-item" onclick="flyTo(${JSON.stringify(c.coords)},'${c.displayName.replace(/'/g,"\\'")}',${c.count})">
+      <div class="r-dot-wrap"><div class="r-dot" style="width:${sz}px;height:${sz}px;background:${c.coords ? color.main : 'var(--border2)'}"></div></div>
+      <div class="r-name" ${!c.coords?'style="color:var(--muted)"':''}>${c.displayName}</div>
+      <div class="r-count">${c.count}×</div>
+      <div class="r-bar-wrap"><div class="r-bar" style="width:${pct}%;background:${color.main}"></div></div>
+    </div>`;
+  }).join('') : '<div style="padding:20px 16px;color:var(--muted);font-size:12px">No rows match current filters.</div>';
+
+  // Date row count badge
+  if (dateMode !== 'all' && allDates.length) {
+    document.getElementById('dateRowCount').textContent = filtered.length.toLocaleString() + ' rows match';
+  } else {
+    document.getElementById('dateRowCount').textContent = '';
+  }
+
+  // Legend
+  const leg = document.getElementById('mapLegend');
+  if (sorted.length) {
+    leg.style.display = 'block';
+    const mid = sorted[Math.floor(sorted.length/2)];
+    document.getElementById('legTitle').textContent =
+      genderFilter === 'all' ? 'Frequency (all)' :
+      genderFilter === 'Male' ? 'Frequency (male)' : 'Frequency (female)';
+    document.getElementById('legRows').innerHTML = `
+      <div class="leg-row"><div class="leg-dot" style="width:${minPx}px;height:${minPx}px;background:${color.main}"></div><span>1 mention</span></div>
+      ${mid ? `<div class="leg-row"><div class="leg-dot" style="width:${Math.round((minPx+maxPx)/2)}px;height:${Math.round((minPx+maxPx)/2)}px;background:${color.main}"></div><span>${mid.count} mentions</span></div>` : ''}
+      <div class="leg-row"><div class="leg-dot" style="width:${maxPx}px;height:${maxPx}px;background:${color.main}"></div><span>${maxCount} mentions</span></div>`;
+  } else {
+    leg.style.display = 'none';
+  }
+}
+
+function flyTo(coords, name, count) {
+  if (!coords) { toast(`<span class="tv">${name}</span> — coordinates not found`); return; }
+  map.setView(coords, 13, {animate:true});
+  toast(`<span class="tv">${name}</span> — ${count} mention${count>1?'s':''}`);
+}
+
+// ── File upload
+const dz = document.getElementById('dropzone');
+document.getElementById('fileInput').addEventListener('change', e => { if(e.target.files[0]) parseFile(e.target.files[0]); });
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); if(e.dataTransfer.files[0]) parseFile(e.dataTransfer.files[0]); });
+
+// ── GeoJSON boundary
+const shpDz = document.getElementById('shpDropzone');
+document.getElementById('shpInput').addEventListener('change', e => { if(e.target.files[0]) loadGeoJSON(e.target.files[0]); });
+shpDz.addEventListener('dragover', e => { e.preventDefault(); shpDz.classList.add('drag'); });
+shpDz.addEventListener('dragleave', () => shpDz.classList.remove('drag'));
+shpDz.addEventListener('drop', e => { e.preventDefault(); shpDz.classList.remove('drag'); if(e.dataTransfer.files[0]) loadGeoJSON(e.dataTransfer.files[0]); });
+
+function loadGeoJSON(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const gj = JSON.parse(e.target.result);
+      if (shpLayer) map.removeLayer(shpLayer);
+      shpLayer = L.geoJSON(gj, {style:getShpStyle()}).addTo(map);
+      document.getElementById('shpStatus').className = 'shp-status ok';
+      document.getElementById('shpStatus').textContent = `✓ ${file.name} — ${gj.features?.length||'?'} features`;
+      document.getElementById('shpControls').style.display = 'block';
+      map.fitBounds(shpLayer.getBounds(), {padding:[20,20]});
+      toast(`Boundary loaded: <span class="tv">${file.name}</span>`);
+    } catch(err) {
+      document.getElementById('shpStatus').className = 'shp-status';
+      document.getElementById('shpStatus').textContent = 'Error: ' + err.message;
+    }
+  };
+  reader.readAsText(file);
+}
+
+function getShpStyle() {
+  const c = document.getElementById('shpColor').value;
+  const o = parseInt(document.getElementById('shpFillOpacity').value) / 100;
+  return {color:c, weight:1, opacity:0.75, fillColor:c, fillOpacity:o};
+}
+function updateShpStyle() {
+  document.getElementById('shpFillVal').textContent = document.getElementById('shpFillOpacity').value + '%';
+  if (shpLayer) shpLayer.setStyle(getShpStyle());
+}
+function removeShapefile() {
+  if (shpLayer) { map.removeLayer(shpLayer); shpLayer = null; }
+  document.getElementById('shpStatus').textContent = '';
+  document.getElementById('shpControls').style.display = 'none';
+}
+
+// ── Sample data generator
+function loadSampleData() {
+  const cities = [
+    'Barcelona','Barcelona','Barcelona','Barcelona','Barcelona','Barcelona','Barcelona','Barcelona',
+    'Girona','Girona','Girona','Lleida','Lleida','Lleida','Tarragona','Tarragona','Tarragona','Tarragona',
+    'Manresa','Manresa','Mataró','Mataró','Mataró','Sabadell','Sabadell','Terrassa','Terrassa','Terrassa',
+    'Badalona','Badalona','Reus','Reus','Reus','Cambrils','Vic','Vic','Figueres','Figueres',
+    'Olot','Blanes','Blanes','Sitges','Sitges','Sitges','Vilanova i la Geltrú','Vilanova i la Geltrú',
+    'Igualada','Berga','Ripoll','Mollet del Vallès','Mollet del Vallès','Amposta','Tortosa','Tortosa',
+    'Valls','Mollerussa','Puigcerdà','Tremp','Solsona','Cardona','Palafrugell','Palamós',
+    'Tossa de Mar','Lloret de Mar','Roses','Premià de Mar','Pineda de Mar','Viladecans','Gavà',
+    'Castelldefels','Cornellà de Llobregat','Martorell','Masnou','Manlleu','Sallent','Banyoles',
+    'Besalú','Camprodon','Molins de Rei','La Seu d\'Urgell',
+  ];
+  const genders = ['Male','Female'];
+  // Generate dates: Jan 2022 – Dec 2023
+  const startMs = new Date('2022-01-01').getTime();
+  const endMs   = new Date('2023-12-31').getTime();
+
+  rawData = Array.from({length:5000}, (_,i) => {
+    const city   = cities[i % cities.length];
+    const gender = genders[Math.random() > 0.48 ? 0 : 1];
+    const ms     = startMs + Math.random() * (endMs - startMs);
+    const d      = new Date(ms);
+    const ds     = d.toISOString().slice(0,10) + ' 00:00:00';
+    return { P: city, B: gender, C: ds, _date: parseDate(ds), A: i+1 };
+  });
+
+  // Gender counts
+  let male = 0, female = 0;
+  rawData.forEach(r => { if(r.B==='Male') male++; else female++; });
+  document.getElementById('gcMale').textContent = male.toLocaleString() + ' male';
+  document.getElementById('gcFemale').textContent = female.toLocaleString() + ' female';
+  document.getElementById('genderCounts').style.display = 'flex';
+
+  const dateSet = {};
+  rawData.forEach(r => { if(r._date) dateSet[dateToKey(r._date)] = r._date; });
+  allDates = Object.values(dateSet).sort((a,b) => a-b);
+
+  initDateSlider();
+
+  document.getElementById('fileStatus').style.display = 'flex';
+  document.getElementById('fileStatusText').textContent = '5 000 rows · sample dataset';
+
+  toast(`Loaded <span class="tv">5 000</span> sample rows — ${allDates.length} unique dates`);
+  renderMap();
+}
+
+// ── Toast
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.innerHTML = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
