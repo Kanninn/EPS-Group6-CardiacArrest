@@ -13,7 +13,9 @@
 <style>
 
 
-/*root sets "basic golobal css variables" */
+/*root sets "basic golobal css variables"
+first row is for easy themeing, bg, surf1/2 give the bacraunf collor in layers 
+text is the main readable text, muted is for less important text */
 :root {
   --bg:#0f0f0f; --surface:#171717; --surface2:#1f1f1f;
   --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.14);
@@ -24,8 +26,16 @@
   --all:#c8f04a; --all-glow:rgba(200,240,74,0.35);
   --amber:#ffb340;
 }
+
+/*box-sizing border-box makes it so that width is box and pading in one */
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+/*here the global variables are used to make the page, 100vh means full viewport height, flex is the positioning system, flex-clloumn means vertical stack, owerflow does the scrolling */
+body{background:var(--bg);
+  color:var(--text);
+  font-family:'Instrument Sans',sans-serif;
+  height:100vh;display:flex;
+  flex-direction:column;
+  overflow:hidden;}
 
 header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;z-index:200;}
 .logo{display:flex;align-items:baseline;gap:10px;}
@@ -36,8 +46,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .pill.on{border-color:var(--accent);color:var(--accent);}
 
 .main{display:flex;flex:1;overflow:hidden;}
+/*felx:1 is  growing into space/ addaptiong*/
 
-/* Sidebar */
+
+/* Sidebar
+the side bar hasa fixed width, 310px and does not shrink (flex-shrink:0)
+and a scrollbar from webkit with width:3px */
+
 .sidebar{width:310px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;}
 .sb-scroll{flex:1;overflow-y:auto;}
 .sb-scroll::-webkit-scrollbar{width:3px;}
@@ -46,10 +61,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .sec-label{font-size:10px;letter-spacing:0.13em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
 .sec-label span{background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:1px 5px;font-size:9px;}
 
-/* Upload */
+/* Upload 
+just specifying how the upload box hould look and interact with hover effects, the input is the actual file input that is hidden but takes the whole space of the upload zone so when you click anywhere it triggers the file dialog
+*/
 .upload-zone{border:1.5px dashed var(--border2);border-radius:8px;padding:14px 12px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;margin-bottom:6px;}
 .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(200,240,74,0.04);}
-.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;} /*This makes the entire upload zone clickable*/
 .upload-icon{width:26px;height:26px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;margin:0 auto 7px;border:1px solid var(--border2);}
 .upload-icon svg{width:13px;height:13px;stroke:var(--muted);}
 .upload-text{font-size:11px;color:var(--muted);line-height:1.5;}
@@ -57,7 +74,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .file-loaded{background:rgba(200,240,74,0.06);border:1px solid rgba(200,240,74,0.2);border-radius:7px;padding:8px 11px;font-size:11px;display:flex;align-items:center;gap:7px;font-family:'DM Mono',monospace;}
 .file-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;flex-shrink:0;}
 
-/* ── Gender filter buttons ── */
+/* ── Gender filter buttons 
+spesifies the buttons for changing between male and female
+── */
 .gender-buttons{display:flex;gap:6px;}
 .gbtn{flex:1;padding:8px 4px;border-radius:7px;border:1px solid var(--border2);background:var(--surface2);font-size:12px;font-weight:500;font-family:'Instrument Sans',sans-serif;cursor:pointer;transition:all 0.18s;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;}
 .gbtn .gbtn-dot{width:8px;height:8px;border-radius:50%;margin-bottom:1px;transition:all 0.18s;}
@@ -72,7 +91,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .gc{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px;}
 .gc-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 
-/* ── Date slider ── */
+/* ── Date slider   */
 .date-slider-wrap{position:relative;}
 .date-display{font-family:'DM Mono',monospace;font-size:13px;color:var(--text);text-align:center;margin-bottom:8px;letter-spacing:0.04em;}
 .date-display span{color:var(--accent);}
@@ -88,7 +107,7 @@ input[type=range].date-slider::-moz-range-thumb{width:16px;height:16px;border-ra
 /* Results list */
 .results-list{padding:0;}
 .result-item{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s;}
-.result-item:hover{background:var(--surface2);}
+.result-item:hover{background:var(--surface2);} /*gives subtle hover effect, graying current item */
 .r-dot-wrap{width:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .r-dot{border-radius:50%;}
 .r-name{font-size:12px;font-weight:500;flex:1;}
@@ -96,23 +115,27 @@ input[type=range].date-slider::-moz-range-thumb{width:16px;height:16px;border-ra
 .r-bar-wrap{width:40px;height:3px;background:var(--border2);border-radius:2px;overflow:hidden;}
 .r-bar{height:100%;border-radius:2px;}
 
-/* Stats bar here */
+/* Stats bar here
+the bottom stats showing how many item in the datasett etc  */
 .stats-bar{padding:9px 16px;border-top:1px solid var(--border);display:flex;gap:14px;flex-shrink:0;}
 .stat{display:flex;flex-direction:column;gap:1px;}
 .stat-val{font-family:'DM Serif Display',serif;font-size:17px;color:var(--accent);line-height:1;}
 .stat-lab{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.09em;}
 
-/* Map */
+
+/* Map, the map is from leaflet  */
 
 /* Dette er bakrunnen altså over basic kartet*/
-#map{flex:1;background:#0a0a0a;}
-.leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(0.38) contrast(1.1);}
+#map{flex:1;background:#0a0a0a;} /*takes remaingn space beside the sidebar*/
+.leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(0.59) contrast(1.1);} /*Trick to make the map darker, just make the coverplane grayscale*/
+/*Zoom controls (?)*/
 .leaflet-control-zoom{border:1px solid var(--border2) !important;background:var(--surface) !important;}
 .leaflet-control-zoom a{background:var(--surface) !important;color:var(--text) !important;border-color:var(--border2) !important;}
 .leaflet-control-zoom a:hover{background:var(--surface2) !important;color:var(--accent) !important;}
 .leaflet-control-attribution{display:none;}
 
-/* Popup */
+/* Popup 
+ */
 .city-popup{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,0.6);}
 .city-popup h3{font-family:'DM Serif Display',serif;font-size:15px;margin-bottom:4px;}
 .city-popup p{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;line-height:1.7;}
@@ -164,27 +187,28 @@ input[type=range].date-slider::-moz-range-thumb{width:16px;height:16px;border-ra
   </div>
 </header>
 
+<!-- Main is everything, sidebar is the side bar and scroll is the smalest. so we subtract sidebarand scrollbar from main, whats lesft is the map-->
 <div class="main">
 <div class="sidebar">
 <div class="sb-scroll">
 
-  <!-- ══ 01 DATASET ══ -->
+  <!-- ══ 01 DATASET this is the section for uploading and managing the dataset -->
   <div class="section">
     <div class="sec-label">01 — Dataset <span>col P = city · col B = gender · col C = date</span></div>
     <div class="upload-zone" id="dropzone">
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
       <div class="upload-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"> <!-- Svg er "laste opp" ikonet-->
           <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
         </svg>
       </div>
       <div class="upload-text"><strong>Upload dataset</strong><br>Excel or CSV — ~5 000 rows</div>
     </div>
-    <div id="fileStatus" style="display:none" class="file-loaded">
+    <div id="fileStatus" style="display:none" class="file-loaded"> <!-- Y\This is hidden for the first time and the nappears if data is inserted-->
       <div class="file-dot"></div><span id="fileStatusText"></span>
     </div>
     <div style="margin-top:7px">
-      <button class="btn-sm" onclick="loadSampleData()">Load sample dataset</button>
+      <button class="btn-sm" onclick="loadSampleData()">Load sample dataset</button> <!-- Runns the javascript function  loadSampleData-->
     </div>
   </div>
 
@@ -192,7 +216,7 @@ input[type=range].date-slider::-moz-range-thumb{width:16px;height:16px;border-ra
   <div class="section">
     <div class="sec-label">02 — Gender Filter <span>col B</span></div>
     <div class="gender-buttons">
-      <button class="gbtn gbtn-all sel" id="gbtn-all" onclick="setGender('all')">
+      <button class="gbtn gbtn-all sel" id="gbtn-all" onclick="setGender('all')"> <!-- calls the setGender function with 'all' as argument  and etc down from here-->
         <div class="gbtn-dot"></div>All
       </button>
       <button class="gbtn gbtn-male" id="gbtn-male" onclick="setGender('Male')">
@@ -235,7 +259,7 @@ input[type=range].date-slider::-moz-range-thumb{width:16px;height:16px;border-ra
     <div class="sec-label">04 — Dot Size</div>
     <div class="col-row">
       <span class="col-label">Min size</span>
-      <input type="range" id="dotMin" min="4" max="14" value="6" style="flex:1" oninput="renderMap()">
+      <input type="range" id="dotMin" min="4" max="14" value="6" style="flex:1" oninput="renderMap()"> <!-- The render map function redraw everything and displayes the inputsize-->
       <span id="dotMinVal" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:20px;text-align:right">6</span>
     </div>
     <div class="col-row" style="margin-bottom:0">
@@ -286,7 +310,7 @@ input[type=range].date-slider::-moz-range-thumb{width:16px;height:16px;border-ra
 </div><!-- /sidebar -->
 
 <div id="map"></div>
-</div><!-- /main -->
+</div><!-- /main here is the rest of the page aka. the map, with the little legend in the left corner, placed by css-->
 
 <div class="map-legend" id="mapLegend">
   <div class="leg-title" id="legTitle">Frequency</div>
@@ -351,6 +375,7 @@ const CITY_COORDS = {
 };
 
 // ── Normalise for lookup (strip accents, lowercase, trim)
+// -- OBS We can add normalisation for ü etc, then it als oworks without municipality codes--
 function norm(s) {
   if (!s) return '';
   return String(s).toLowerCase()
@@ -358,6 +383,7 @@ function norm(s) {
     .replace(/\s+/g,' ').trim();
 }
 
+// This searches the name list for a match of the city name and returns the coordinates if found, otherwise it returns null. It first tries an exact match, then a startsWith or endsWith match to handle cases like "Barcelona" vs "Barcelona, Spain" or "Barcelona (Catalonia)"
 function lookupCoords(name) {
   const n = norm(name);
   if (CITY_COORDS[n]) return CITY_COORDS[n];
@@ -367,11 +393,12 @@ function lookupCoords(name) {
   return null;
 }
 
+
 // ── Parse date string "2022-01-01 00:00:00" → JS Date (day only, UTC noon)
 function parseDate(s) {
   if (!s) return null;
   const str = String(s).trim();
-  // Handles "2022-01-01 00:00:00", "2022-01-01T00:00:00", "2022-01-01"
+  // Handles "2022-01-01 00:00:00", "2022-01-01T00:00:00", "2022-01-01 to avoid timezone issues by setting time to noon UTC selv om det er unødvendig "
   const m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return null;
   return new Date(Date.UTC(+m[1], +m[2]-1, +m[3], 12, 0, 0));
@@ -388,15 +415,15 @@ function fmtDate(d) {
   return d.toISOString().slice(0,10);
 }
 
-// ── Map init
+// ── Map init, sett map to auto center on catalonia 
 const map = L.map('map',{center:[41.7,1.7],zoom:8,zoomControl:true,attributionControl:false});
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);//makes dark tiles from cartoDB, we can change this to other tile providers if we want, but this one is nice and simple for now
 
 // Catalonia outline
 const catPoly=[[42.848,0.72],[42.82,1.45],[42.75,1.75],[42.55,2.10],[42.45,2.65],[42.35,2.95],[42.18,3.10],[41.95,3.22],[41.70,3.15],[41.50,2.85],[41.35,2.65],[41.25,2.30],[41.10,1.90],[40.85,1.35],[40.70,0.85],[40.65,0.50],[40.72,0.30],[40.85,0.18],[41.10,0.15],[41.35,0.28],[41.55,0.42],[41.75,0.58],[41.95,0.65],[42.20,0.70],[42.50,0.72],[42.72,0.72]];
 L.polygon(catPoly,{stroke:true,color:'rgba(200,240,74,0.2)',weight:1.2,fillColor:'rgba(200,240,74,0.02)',fillOpacity:1}).addTo(map);
 
-// ── State
+// ── State -- these work as memory for the website. all states, so what is selected is stored here and then the render functions read from this when they need to update the display. This way we can avoid passing a zillion parameters around and just have one source of truth for the current settings and data.
 let rawData = [];
 let allDates = [];       // sorted unique Date objects from col C
 let genderFilter = 'all';
@@ -405,7 +432,7 @@ let dateIdx = 0;         // index into allDates array
 let markers = [];
 let shpLayer = null;
 
-// ── Dot color per gender filter
+// ── Dot color per gender filter, changes the color of the dots on the map based on the selected gender
 function dotColor() {
   if (genderFilter === 'Male')   return { main:'#60a5fa', glow:'rgba(96,165,250,0.35)' };
   if (genderFilter === 'Female') return { main:'#f472b6', glow:'rgba(244,114,182,0.35)' };
@@ -414,15 +441,15 @@ function dotColor() {
 
 // ── Gender button selection
 function setGender(g) {
-  genderFilter = g;
+  genderFilter = g; //updates the state
   ['all','Male','Female'].forEach(v => {
     const el = document.getElementById('gbtn-' + v.toLowerCase());
-    if (el) el.classList.toggle('sel', v === g || (v === 'all' && g === 'all'));
+    if (el) el.classList.toggle('sel', v === g || (v === 'all' && g === 'all')); //This Updates the UI
   });
   renderMap();
 }
 
-// ── Date mode
+// ── Date mode for the date filter, changes how the date filter works based on the selected mode
 function setDateMode(m) {
   dateMode = m;
   ['exact','cumul','all'].forEach(id => {
@@ -432,12 +459,14 @@ function setDateMode(m) {
   renderMap();
 }
 
+//this id for the date slider, takes in the value from the silder and puts it into dateIdx, then it updates the date display and renders the map again to reflect the new date filter settings 
 function onDateSlide() {
   dateIdx = parseInt(document.getElementById('dateSlider').value);
   updateDateDisplay();
   renderMap();
 }
 
+//dette er også for date display men funker ikke helt enda så vi kan se bort fra det nå, men ødelegger heller ikke 
 function updateDateDisplay() {
   if (!allDates.length) return;
   const d = allDates[dateIdx];
@@ -448,15 +477,16 @@ function updateDateDisplay() {
   document.getElementById('dateSlider').disabled = (dateMode === 'all');
 }
 
-// ── Filter rawData by current gender + date settings
-function getFilteredRows() {
+// ── Filter rawData by current gender + date settings, checks if each row in the raw data matches the current gender and date filters, and returns a new array of rows that match the filters. This is used to determine which data points should be shown on the map based on the user's filter selections.
+//how this works i dont know but it seems to be the function that filters the data based on the selected, thx Claude ")
+function getFilteredRows() { // reads out the data from raw data filters it based on the collumn, so here it is importnat that the data has correct collumns 
   return rawData.filter(row => {
     // Gender filter (col B)
     if (genderFilter !== 'all') {
       const g = String(row.B || '').trim();
       if (g !== genderFilter) return false;
     }
-    // Date filter (col C)
+    // Date filter (col C), only returns those where the date matches if its set to exact .etc 
     if (dateMode !== 'all' && allDates.length) {
       const rowDate = row._date;
       if (!rowDate) return false;
@@ -468,14 +498,14 @@ function getFilteredRows() {
   });
 }
 
-// ── Build frequency map from a set of rows
+// ── Build frequency map from a set of rows, the thing that counts how many times a city is mentioned    
 function buildFreq(rows) {
   const freq = {};
   rows.forEach(row => {
-    const name = String(row.P || '').trim();
+    const name = String(row.P || '').trim(); //reads out the city name 
     if (!name || name.length < 2) return;
     const key = norm(name);
-    if (!freq[key]) freq[key] = { count:0, displayName:name, coords: lookupCoords(name), male:0, female:0 };
+    if (!freq[key]) freq[key] = { count:0, displayName:name, coords: lookupCoords(name), male:0, female:0 }; //same with the gender 
     freq[key].count++;
     const g = String(row.B || '').trim();
     if (g === 'Male')   freq[key].male++;
@@ -484,17 +514,18 @@ function buildFreq(rows) {
   return freq;
 }
 
-// ── Main parse
+// ── Main parse ---This is the main part that reads the datasett. uses a 
 function parseFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const wb = XLSX.read(e.target.result, {type:'binary'});//parses XLSX files SHEEUS library, we can change this to a CSV parser if we want to support CSV files as well
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      if (!rows.length) { toast('File appears empty.'); return; }
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''}); //this converts the data to rows where header:1 means that the first row is treated as a header and defval:'' means that empty cells are filled with an empty string instead of undefined
+      if (!rows.length) { toast('File appears empty.'); return; } //returns a multidimensional array, arrray of arrays 
 
-      // Map column letters — row 0 is the header
+      // Map column letters — row 0 is the header, mapps letters to the column index, so A = 0, B = 1, C = 2 etc. this allows us to access the columns by their letter in the rest of the code, 
+      // which is more intuitive given that we are expecting specific data in specific columns (P for city, and B for gender, makes it easy)
       const header = rows[0];
       const colLetters = header.map((_,i) => {
         const n = i + 1;
@@ -503,6 +534,7 @@ function parseFile(file) {
           : String.fromCharCode(64+Math.floor((n-1)/26)) + String.fromCharCode(64+((n-1)%26)+1);
       });
 
+      //This makes each row in the array an object (a incident) so its saved like P:"barcelona " , B : "Male" , C: "2022-01-01" etc, 
       rawData = rows.slice(1).map(row => {
         const obj = {};
         row.forEach((val,i) => { obj[colLetters[i]] = val; });
@@ -510,12 +542,14 @@ function parseFile(file) {
         return obj;
       });
 
-      // Build sorted unique dates
+      // Build sorted unique dates, not rally need for us because the database is sorted, but if you give data that is not sorted on date this will do it 
       const dateSet = {};
       rawData.forEach(r => { if (r._date) dateSet[dateToKey(r._date)] = r._date; });
       allDates = Object.values(dateSet).sort((a,b) => a-b);
 
       initDateSlider();
+
+      //updates UI status
 
       document.getElementById('fileStatus').style.display = 'flex';
       document.getElementById('fileStatusText').textContent =
@@ -540,7 +574,7 @@ function parseFile(file) {
   };
   reader.readAsBinaryString(file);
 }
-
+//This just specifies the Date slider, it checks if there are any dates in the data, if not it shows a message saying that there are no valid dates and does not show the slider 
 function initDateSlider() {
   const wrap = document.getElementById('dateSliderWrap');
   const noData = document.getElementById('dateNoData');
@@ -561,8 +595,8 @@ function initDateSlider() {
   updateDateDisplay();
 }
 
-// ── Render markers
-function renderMap() {
+// ── Render markers -- This is where it happens 
+function renderMap() {//removs old marker for clean beging 
   markers.forEach(m => map.removeLayer(m));
   markers = [];
 
@@ -570,6 +604,7 @@ function renderMap() {
   document.getElementById('dotMinVal').textContent = document.getElementById('dotMin').value;
   document.getElementById('dotMaxVal').textContent = document.getElementById('dotMax').value;
 
+  //this just defines values that are sett, the first are 
   const filtered = getFilteredRows();
   const freq = buildFreq(filtered);
   const cities = Object.values(freq);
@@ -583,13 +618,13 @@ function renderMap() {
 
   function dotSz(count) {
     if (maxCount === minCount) return (minPx + maxPx) / 2;
-    // sqrt scaling: prevents one dominant city drowning out the rest
+    // sqrt scaling: prevents one dominant city drowning out the rest, so the size increase by the square root of the ammount, so the bigger it gets the samler the precantage increase is 
     const t = Math.sqrt((count - minCount) / (maxCount - minCount));
     return minPx + t * (maxPx - minPx);
   }
-
+// This is the part that actually creates the markers on the map. It loops through each city in the cities array, checks if it has coordinates, and if it does, it creates a marker with a size based on the count of mentions for that city. It also binds a popup to each marker that shows the city name, mention count
   cities.forEach(city => {
-    if (!city.coords) return;
+    if (!city.coords) return; // if there are no coordinates for the city, it skips it and does not create a marker for it
     const sz = dotSz(city.count);
     const icon = L.divIcon({
       html: `<div style="
@@ -605,15 +640,16 @@ function renderMap() {
          onmouseout="this.style.transform='';this.style.opacity='0.88'"></div>`,
       className:'', iconSize:[sz,sz], iconAnchor:[sz/2,sz/2],
     });
-    const gLabel = genderFilter === 'all'
+    const gLabel = genderFilter === 'all' // this part is for the popup label, 
       ? `<span style="color:#60a5fa">${city.male}M</span> / <span style="color:#f472b6">${city.female}F</span>`
       : `${city.count} ${genderFilter}`;
     const dateLabel = dateMode === 'all' ? 'All dates' :
                       dateMode === 'exact' ? fmtDate(allDates[dateIdx]) :
                       `Up to ${fmtDate(allDates[dateIdx])}`;
-    const m = L.marker(city.coords,{icon})
+    const m = L.marker(city.coords,{icon}) //This creates the marker on the map using the Leaflet library, it sets the position to city.coords and uses the custom icon we created earlier. It then binds a popup to the marker that shows the city name, mention count
       .addTo(map)
-      .bindPopup(`<div class="city-popup">
+      //this binds the the popup to the point and sets the content of the popup to show the city name, the number of mentions
+      .bindPopup(`<div class="city-popup"> 
         <h3 style="color:${color.main}">${city.displayName}</h3>
         <p>Mentions: <strong style="color:${color.main}">${city.count}</strong><br>
         Gender: ${gLabel}<br>
@@ -623,12 +659,12 @@ function renderMap() {
     markers.push(m);
   });
 
-  // Sidebar list
+  // Sidebar list that has some const that enable the flyTo 
   const sorted = cities.sort((a,b) => b.count - a.count);
   const mapped = sorted.filter(c => c.coords).length;
 
   document.getElementById('statsBar').style.display = 'flex';
-  document.getElementById('statRows').textContent = filtered.length.toLocaleString();
+  document.getElementById('statRows').textContent = filtered.length.toLocaleString(); // This updates the stats bar at the bottom of the sidebar, showing the number of visible rows after filtering, the number of cities shown on the map, and how many of those cities have coordinates (mapped)
   document.getElementById('statCities').textContent = sorted.length;
   document.getElementById('statMapped').textContent = mapped;
   document.getElementById('listLabel').textContent = sorted.length + ' cities';
@@ -668,6 +704,7 @@ function renderMap() {
   }
 }
 
+//makes it possible to click on the sidebar and then fly to it on the map 
 function flyTo(coords, name, count) {
   if (!coords) { toast(`<span class="tv">${name}</span> — coordinates not found`); return; }
   map.setView(coords, 13, {animate:true});
