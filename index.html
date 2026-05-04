@@ -25,6 +25,10 @@ text is the main readable text, muted is for less important text */
   --female:#f472b6; --female-glow:rgba(244,114,182,0.35);
   --all:#c8f04a; --all-glow:rgba(200,240,74,0.35);
   --amber:#ffb340;
+  --fast:#34d399;   --fast-bg:rgba(52,211,153,0.08);    --fast-glow:rgba(52,211,153,0.3);
+  --slow:#fb923c;   --slow-bg:rgba(251,146,60,0.08);    --slow-glow:rgba(251,146,60,0.3);
+  --dea-y:#a78bfa;  --dea-y-bg:rgba(167,139,250,0.08);  --dea-y-glow:rgba(167,139,250,0.3);
+  --dea-n:#94a3b8;  --dea-n-bg:rgba(148,163,184,0.08);
 }
 
 /*box-sizing border-box makes it so that width is box and pading in one */
@@ -52,6 +56,16 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 /* Sidebar
 the side bar hasa fixed width, 310px and does not shrink (flex-shrink:0)
 and a scrollbar from webkit with width:3px */
+
+.filter-group{display:flex;gap:5px;}
+.fbtn{
+  flex:1;padding:8px 5px;border-radius:7px;
+  border:1px solid var(--border2);background:var(--surface2);
+  font-size:11px;font-weight:500;font-family:'Instrument Sans',sans-serif;
+  cursor:pointer;transition:all 0.18s;color:var(--muted);
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+}
+.fbtn-dot{width:7px;height:7px;border-radius:50%;}
 
 .sidebar{width:310px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;}
 .sb-scroll{flex:1;overflow-y:auto;}
@@ -91,7 +105,7 @@ spesifies the buttons for changing between male and female
 .gc{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px;}
 .gc-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 
-/* ── Date slider   */
+/* ── Date slider   
 .date-slider-wrap{position:relative;}
 .date-display{font-family:'DM Mono',monospace;font-size:13px;color:var(--text);text-align:center;margin-bottom:8px;letter-spacing:0.04em;}
 .date-display span{color:var(--accent);}
@@ -103,6 +117,16 @@ input[type=range].date-slider::-moz-range-thumb{width:16px;height:16px;border-ra
 .dmbtn{flex:1;padding:5px;border-radius:6px;border:1px solid var(--border2);background:var(--surface2);font-size:10px;font-family:'Instrument Sans',sans-serif;cursor:pointer;transition:all 0.18s;color:var(--muted);}
 .dmbtn.sel{border-color:var(--accent);color:var(--accent);background:rgba(200,240,74,0.07);}
 .date-no-data{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;padding:4px 0;}
+*/
+
+/* Response time */
+.fbtn-time-all  .fbtn-dot{background:var(--accent);}
+.fbtn-fast      .fbtn-dot{background:var(--fast);}
+.fbtn-slow      .fbtn-dot{background:var(--slow);}
+.fbtn-time-all.sel{border-color:var(--accent);background:rgba(200,240,74,0.07);color:var(--accent);}
+.fbtn-fast.sel    {border-color:var(--fast);  background:var(--fast-bg);       color:var(--fast);}
+.fbtn-slow.sel    {border-color:var(--slow);  background:var(--slow-bg);       color:var(--slow);}
+
 
 /* Results list */
 .results-list{padding:0;}
@@ -232,12 +256,12 @@ the bottom stats showing how many item in the datasett etc  */
     </div>
   </div>
 
-  <!-- ══ 03 DATE FILTER ══ -->
+  <!-- ══ 03 DATE FILTER ══ 
   <div class="section">
     <div class="sec-label">03 — Date Filter <span>col C</span></div>
     <div id="dateSliderWrap" style="display:none">
       <!-- Mode: exact day vs. cumulative up-to -->
-      <div class="date-mode-row">
+      <!--div class="date-mode-row">
         <button class="dmbtn sel" id="dm-exact" onclick="setDateMode('exact')">Exact day</button>
         <button class="dmbtn" id="dm-cumul" onclick="setDateMode('cumulative')">Up to date</button>
         <button class="dmbtn" id="dm-all"   onclick="setDateMode('all')">All dates</button>
@@ -252,6 +276,26 @@ the bottom stats showing how many item in the datasett etc  */
       <div style="margin-top:6px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)" id="dateRowCount"></div>
     </div>
     <div id="dateNoData" class="date-no-data">Load a dataset to enable date filtering.</div>
+  </div>-->
+
+  <div class="section">
+    <div class="sec-label">03 — Response Time <span class="col-tag">col F → I</span></div>
+    <div class="filter-group">
+      <button class="fbtn fbtn-time-all sel" id="t-all"  onclick="setTime('all')">
+        <div class="fbtn-dot"></div>All
+      </button>
+      <button class="fbtn fbtn-fast"         id="t-fast" onclick="setTime('fast')">
+        <div class="fbtn-dot"></div>&lt; 8 min
+      </button>
+      <button class="fbtn fbtn-slow"         id="t-slow" onclick="setTime('slow')">
+        <div class="fbtn-dot"></div>&ge; 8 min
+      </button>
+    </div>
+    <div class="sub-counts" id="timeCounts" style="display:none">
+      <div class="sc"><div class="sc-dot" style="background:var(--fast)"></div><span id="scFast">—</span></div>
+      <div class="sc"><div class="sc-dot" style="background:var(--slow)"></div><span id="scSlow">—</span></div>
+      <div class="sc"><div class="sc-dot" style="background:var(--muted)"></div><span id="scNoTime">—</span></div>
+    </div>
   </div>
 
   <!-- ══ 04 DOT SIZE ══ -->
