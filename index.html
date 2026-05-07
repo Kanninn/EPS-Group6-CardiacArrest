@@ -91,6 +91,23 @@ spesifies the buttons for changing between male and female
 .gc{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px;}
 .gc-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 
+/* ── Gender filter buttons 
+spesifies the buttons for changing between male and female
+── */
+.gender-buttons{display:flex;gap:6px;}
+.gbtn{flex:1;padding:8px 4px;border-radius:7px;border:1px solid var(--border2);background:var(--surface2);font-size:12px;font-weight:500;font-family:'Instrument Sans',sans-serif;cursor:pointer;transition:all 0.18s;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;}
+.gbtn .gbtn-dot{width:8px;height:8px;border-radius:50%;margin-bottom:1px;transition:all 0.18s;}
+.gbtn-all .gbtn-dot{background:var(--all);}
+.gbtn-male .gbtn-dot{background:var(--male);}
+.gbtn-female .gbtn-dot{background:var(--female);}
+.gbtn.sel{color:var(--text);}
+.gbtn-all.sel{border-color:var(--all);background:rgba(200,240,74,0.07);color:var(--all);}
+.gbtn-male.sel{border-color:var(--male);background:rgba(96,165,250,0.07);color:var(--male);}
+.gbtn-female.sel{border-color:var(--female);background:rgba(244,114,182,0.07);color:var(--female);}
+.gender-counts{display:flex;gap:10px;margin-top:8px;}
+.gc{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px;}
+.gc-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
 /* ── Date slider   */
 .date-slider-wrap{position:relative;}
 .date-display{font-family:'DM Mono',monospace;font-size:13px;color:var(--text);text-align:center;margin-bottom:8px;letter-spacing:0.04em;}
@@ -291,6 +308,24 @@ the bottom stats showing how many item in the datasett etc  */
     </div>
   </div>
 
+   <!-- ══ 07 REGIONS ══ -->
+  <div class="section">
+  <div class="sec-label">07 — Regions</div>
+
+  <button class="btn-sm" onclick="switchRegion('health')">
+    Show Health Regions
+  </button>
+
+  <button class="btn-sm" onclick="switchRegion('comarques')">
+    Show Counties (Comarques)
+  </button>
+
+  <button class="btn-sm" onclick="switchRegion('none')">
+    Remove Regions
+  </button>
+</div>
+
+
   <!-- ══ 06 CITY LIST ══ -->
   <div class="section" style="padding-bottom:6px">
     <div class="sec-label">06 — Results <span id="listLabel">—</span></div>
@@ -374,6 +409,26 @@ const CITY_COORDS = {
   'santa coloma de farners':[41.8589,2.6737],'sant sadurni d\'anoia':[41.4261,1.7862],
 };
 
+const HEALTH_REGIONS = {
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Barcelona Region" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [2.0, 41.2],
+          [2.5, 41.2],
+          [2.5, 41.6],
+          [2.0, 41.6],
+          [2.0, 41.2]
+        ]]
+      }
+    }
+  ]
+};
+
 // ── Normalise for lookup (strip accents, lowercase, trim)
 // -- OBS We can add normalisation for ü etc, then it als oworks without municipality codes--
 function norm(s) {
@@ -419,6 +474,18 @@ function fmtDate(d) {
 const map = L.map('map',{center:[41.7,1.7],zoom:8,zoomControl:true,attributionControl:false});
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);//makes dark tiles from cartoDB, we can change this to other tile providers if we want, but this one is nice and simple for now
 
+const healthLayer = L.geoJSON(HEALTH_REGIONS, {
+  style: {
+    color: "#ffb340",
+    weight: 2,
+    fillOpacity: 0.08
+  },
+  onEachFeature: (feature, layer) => {
+    layer.bindPopup(feature.properties.name);
+  }
+}).addTo(map);
+
+
 // Catalonia outline
 const catPoly=[[42.848,0.72],[42.82,1.45],[42.75,1.75],[42.55,2.10],[42.45,2.65],[42.35,2.95],[42.18,3.10],[41.95,3.22],[41.70,3.15],[41.50,2.85],[41.35,2.65],[41.25,2.30],[41.10,1.90],[40.85,1.35],[40.70,0.85],[40.65,0.50],[40.72,0.30],[40.85,0.18],[41.10,0.15],[41.35,0.28],[41.55,0.42],[41.75,0.58],[41.95,0.65],[42.20,0.70],[42.50,0.72],[42.72,0.72]];
 L.polygon(catPoly,{stroke:true,color:'rgba(200,240,74,0.2)',weight:1.2,fillColor:'rgba(200,240,74,0.02)',fillOpacity:1}).addTo(map);
@@ -431,6 +498,7 @@ let dateMode = 'all';    // 'all' | 'exact' | 'cumulative'
 let dateIdx = 0;         // index into allDates array
 let markers = [];
 let shpLayer = null;
+let regionMode = 'none'; // 'health' | 'comarques' | 'none'
 
 // ── Dot color per gender filter, changes the color of the dots on the map based on the selected gender
 function dotColor() {
@@ -702,6 +770,34 @@ function renderMap() {//removs old marker for clean beging
   } else {
     leg.style.display = 'none';
   }
+}
+
+function switchRegion(mode) {
+  regionMode = mode;
+
+  // fjern eksisterende lag
+  if (shpLayer) {
+    map.removeLayer(shpLayer);
+    shpLayer = null;
+  }
+
+  let data = null;
+
+  if (mode === 'health') data = HEALTH_REGIONS;
+  if (mode === 'comarques') data = COMARQUES;
+
+  if (!data) return;
+
+  shpLayer = L.geoJSON(data, {
+    style: {
+      color: mode === 'health' ? '#ffb340' : '#60a5fa',
+      weight: 1.5,
+      fillOpacity: 0.05
+    },
+    onEachFeature: (f, l) => {
+      l.bindPopup(f.properties.name || "Region");
+    }
+  }).addTo(map);
 }
 
 //makes it possible to click on the sidebar and then fly to it on the map 
