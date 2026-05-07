@@ -1,4 +1,4 @@
-<!--Test om commit funker-->
+<!--Test om commit funker--><!--Try-->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -492,6 +492,13 @@ function setGender(g) {
   });
   renderMap();
 }
+//for the arrival time
+function setTime(v){
+  timeFilter=v;
+  ['all','fast','slow'].forEach(x=>document.getElementById('t-'+x).classList.remove('sel'));
+  document.getElementById('t-'+v).classList.add('sel');
+  updateFilterBar(); renderMap();
+}
 
 // ── Date mode for the date filter, changes how the date filter works based on the selected mode
 function setDateMode(m) {
@@ -502,6 +509,19 @@ function setDateMode(m) {
   updateDateDisplay();
   renderMap();
 }
+
+ // Response time counts
+  let fast=0,slow=0,noTime=0;
+  rawData.forEach(r=>{
+    const f=parseTs(r.F), i=parseTs(r.I);
+    if(f===null||i===null||i-f<0){ noTime++; return; }
+    const m=(i-f)/60000;
+    if(m<8) fast++; else slow++;
+  });
+  document.getElementById('scFast').textContent=fast.toLocaleString()+' under 8 min';
+  document.getElementById('scSlow').textContent=slow.toLocaleString()+' 8 min or over';
+  document.getElementById('scNoTime').textContent=noTime.toLocaleString()+' no timestamp';
+  document.getElementById('timeCounts').style.display='flex';
 
 //this id for the date slider, takes in the value from the silder and puts it into dateIdx, then it updates the date display and renders the map again to reflect the new date filter settings 
 function onDateSlide() {
