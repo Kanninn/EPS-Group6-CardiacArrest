@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoData Catalonia — v4</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<!-- =====================================================================
+  COLUMN REFERENCE (fixed — matches your Excel):
+    B  = Gender          ("Male" / "Female")
+    F  = Arrival time 1  ("2022-01-01 14:08:01")  — earlier timestamp
+    H  = DEA used        ("Yes" / "No")
+    I  = Arrival time 2  ("2022-01-01 14:16:23")  — later timestamp
+    P  = Municipality    (city name)
+  ===================================================================== -->
+
+<style>
+/* ── Design tokens ── */
+:root {
+  --bg:#0f0f0f; --surface:#171717; --surface2:#1f1f1f;
+  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.14);
+  --text:#e8e6e0; --muted:#6b6960;
+  --accent:#c8f04a;
+  --male:#60a5fa;   --male-bg:rgba(96,165,250,0.08);   --male-glow:rgba(96,165,250,0.3);
+  --female:#f472b6; --female-bg:rgba(244,114,182,0.08); --female-glow:rgba(244,114,182,0.3);
+  --fast:#34d399;   --fast-bg:rgba(52,211,153,0.08);    --fast-glow:rgba(52,211,153,0.3);
+  --slow:#fb923c;   --slow-bg:rgba(251,146,60,0.08);    --slow-glow:rgba(251,146,60,0.3);
+  --dea-y:#a78bfa;  --dea-y-bg:rgba(167,139,250,0.08);  --dea-y-glow:rgba(167,139,250,0.3);
+  --dea-n:#94a3b8;  --dea-n-bg:rgba(148,163,184,0.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── Header ── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;height:52px;
+  border-bottom:1px solid var(--border);background:var(--surface);
+  flex-shrink:0;z-index:200;
+}
+.logo{display:flex;align-items:baseline;gap:9px;}
+.logo-mark{font-family:'DM Serif Display',serif;font-size:20px;color:var(--accent);letter-spacing:-0.5px;}
+.logo-sub{font-size:10px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;}
+.stack-pills{display:flex;gap:5px;}
+.pill{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid var(--border2);color:var(--muted);}
+.pill.on{border-color:var(--accent);color:var(--accent);}
+
+/* ── Layout ── */
+.main{display:flex;flex:1;overflow:hidden;}
+
+/* ── Sidebar ── */
+.sidebar{
+  width:296px;flex-shrink:0;
+  border-right:1px solid var(--border);background:var(--surface);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.sb-scroll{flex:1;overflow-y:auto;}
+.sb-scroll::-webkit-scrollbar{width:3px;}
+.sb-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+
+/* ── Section wrapper ── */
+.section{padding:14px 15px;border-bottom:1px solid var(--border);}
+.sec-label{
+  font-size:9.5px;letter-spacing:0.13em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:9px;
+  display:flex;align-items:center;gap:5px;
+}
+.sec-label .col-tag{
+  font-family:'DM Mono',monospace;
+  background:var(--surface2);border:1px solid var(--border2);
+  border-radius:3px;padding:1px 5px;font-size:9px;color:var(--muted);
+}
+
+/* ── Active filter chips (top of sidebar) ── */
+.filter-bar{
+  padding:10px 15px;border-bottom:1px solid var(--border);
+  display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:40px;
+}
+.fchip{
+  font-family:'DM Mono',monospace;font-size:10px;
+  padding:3px 8px;border-radius:20px;
+  border:1px solid var(--border2);color:var(--muted);
+  display:flex;align-items:center;gap:4px;
+  background:var(--surface2);
+}
+.fchip.c-male   {border-color:var(--male);color:var(--male);background:var(--male-bg);}
+.fchip.c-female {border-color:var(--female);color:var(--female);background:var(--female-bg);}
+.fchip.c-fast   {border-color:var(--fast);color:var(--fast);background:var(--fast-bg);}
+.fchip.c-slow   {border-color:var(--slow);color:var(--slow);background:var(--slow-bg);}
+.fchip.c-dea-y  {border-color:var(--dea-y);color:var(--dea-y);background:var(--dea-y-bg);}
+.fchip.c-dea-n  {border-color:var(--dea-n);color:var(--dea-n);background:var(--dea-n-bg);}
+.chip-x{opacity:0.6;cursor:pointer;font-size:12px;line-height:1;}
+.chip-x:hover{opacity:1;}
+.btn-reset{
+  margin-left:auto;
+  font-size:10px;font-family:'Instrument Sans',sans-serif;
+  padding:3px 9px;border-radius:5px;
+  border:1px solid var(--border2);background:transparent;
+  color:var(--muted);cursor:pointer;transition:all 0.15s;white-space:nowrap;
+}
+.btn-reset:hover{border-color:#ff6b6b;color:#ff6b6b;}
+.no-filters{font-size:11px;color:var(--muted);font-style:italic;}
+
+/* ── Upload ── */
+.upload-zone{
+  border:1.5px dashed var(--border2);border-radius:7px;
+  padding:12px;text-align:center;cursor:pointer;transition:all 0.2s;
+  position:relative;margin-bottom:6px;
+}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(200,240,74,0.04);}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-icon{width:24px;height:24px;background:var(--surface2);border-radius:5px;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;border:1px solid var(--border2);}
+.upload-icon svg{width:12px;height:12px;stroke:var(--muted);}
+.upload-text{font-size:11px;color:var(--muted);line-height:1.5;}
+.upload-text strong{color:var(--text);font-weight:500;}
+.file-loaded{
+  background:rgba(200,240,74,0.05);border:1px solid rgba(200,240,74,0.18);
+  border-radius:6px;padding:7px 10px;font-size:10px;
+  display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;color:var(--muted);
+}
+.file-dot{width:5px;height:5px;background:var(--accent);border-radius:50%;flex-shrink:0;}
+.btn-sm{
+  width:100%;background:var(--surface2);border:1px solid var(--border2);
+  border-radius:6px;padding:5px;font-size:11px;color:var(--muted);
+  cursor:pointer;font-family:'Instrument Sans',sans-serif;transition:all 0.18s;margin-top:6px;
+}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── Filter button group (reusable for all 3 filter sections) ── */
+.filter-group{display:flex;gap:5px;}
+.fbtn{
+  flex:1;padding:8px 5px;border-radius:7px;
+  border:1px solid var(--border2);background:var(--surface2);
+  font-size:11px;font-weight:500;font-family:'Instrument Sans',sans-serif;
+  cursor:pointer;transition:all 0.18s;color:var(--muted);
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+}
+.fbtn-dot{width:7px;height:7px;border-radius:50%;}
+/* Gender */
+.fbtn-all   .fbtn-dot{background:var(--accent);}
+.fbtn-male  .fbtn-dot{background:var(--male);}
+.fbtn-female .fbtn-dot{background:var(--female);}
+.fbtn-all.sel  {border-color:var(--accent); background:rgba(200,240,74,0.07); color:var(--accent);}
+.fbtn-male.sel {border-color:var(--male);   background:var(--male-bg);        color:var(--male);}
+.fbtn-female.sel{border-color:var(--female);background:var(--female-bg);      color:var(--female);}
+/* Response time */
+.fbtn-time-all  .fbtn-dot{background:var(--accent);}
+.fbtn-fast      .fbtn-dot{background:var(--fast);}
+.fbtn-slow      .fbtn-dot{background:var(--slow);}
+.fbtn-time-all.sel{border-color:var(--accent);background:rgba(200,240,74,0.07);color:var(--accent);}
+.fbtn-fast.sel    {border-color:var(--fast);  background:var(--fast-bg);       color:var(--fast);}
+.fbtn-slow.sel    {border-color:var(--slow);  background:var(--slow-bg);       color:var(--slow);}
+/* DEA */
+.fbtn-dea-all .fbtn-dot{background:var(--accent);}
+.fbtn-dea-y   .fbtn-dot{background:var(--dea-y);}
+.fbtn-dea-n   .fbtn-dot{background:var(--dea-n);}
+.fbtn-dea-all.sel{border-color:var(--accent);background:rgba(200,240,74,0.07);color:var(--accent);}
+.fbtn-dea-y.sel  {border-color:var(--dea-y); background:var(--dea-y-bg);      color:var(--dea-y);}
+.fbtn-dea-n.sel  {border-color:var(--dea-n); background:var(--dea-n-bg);      color:var(--dea-n);}
+
+/* sub-count row */
+.sub-counts{display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;}
+.sc{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px;}
+.sc-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+
+/* ── Dot size controls ── */
+.size-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+.size-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:52px;}
+input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:var(--border2);outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);cursor:pointer;}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);cursor:pointer;}
+.size-val{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:18px;text-align:right;}
+
+/* ── Results list ── */
+.results-list{padding:0;}
+.result-item{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 15px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background 0.12s;
+}
+.result-item:hover{background:var(--surface2);}
+.r-dot-wrap{width:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.r-dot{border-radius:50%;}
+.r-name{font-size:11.5px;font-weight:500;flex:1;}
+.r-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;}
+.r-bar-wrap{width:36px;height:3px;background:var(--border2);border-radius:2px;overflow:hidden;}
+.r-bar{height:100%;border-radius:2px;}
+
+/* ── Stats bar ── */
+.stats-bar{
+  padding:8px 15px;border-top:1px solid var(--border);
+  display:flex;gap:14px;flex-shrink:0;
+}
+.stat{display:flex;flex-direction:column;gap:1px;}
+.stat-val{font-family:'DM Serif Display',serif;font-size:16px;color:var(--accent);line-height:1;}
+.stat-lab{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.09em;}
+
+/* ── Map ── */
+#map{flex:1;background:#0a0a0a;}
+.leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(0.48) contrast(1.1);}
+.leaflet-control-zoom{border:1px solid var(--border2)!important;background:var(--surface)!important;}
+.leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border2)!important;}
+.leaflet-control-zoom a:hover{background:var(--surface2)!important;color:var(--accent)!important;}
+.leaflet-control-attribution{display:none;}
+
+/* ── Popup ── */
+.city-popup{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;min-width:170px;box-shadow:0 8px 32px rgba(0,0,0,0.6);}
+.city-popup h3{font-family:'DM Serif Display',serif;font-size:15px;margin-bottom:5px;}
+.city-popup p{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;line-height:1.75;}
+.leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0;}
+.leaflet-popup-content{margin:0;}
+.leaflet-popup-tip-container{display:none;}
+
+/* ── Legend ── */
+.map-legend{
+  position:absolute;bottom:14px;left:312px;z-index:500;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:8px;padding:9px 12px;font-size:11px;color:var(--muted);display:none;
+}
+.leg-title{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;color:var(--text);}
+.leg-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.leg-dot{border-radius:50%;flex-shrink:0;}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:16px;right:16px;
+  background:var(--surface);border:1px solid var(--border2);border-left:3px solid var(--accent);
+  border-radius:8px;padding:9px 13px;font-size:11px;color:var(--text);
+  transform:translateY(50px);opacity:0;transition:all 0.3s cubic-bezier(.16,1,.3,1);
+  z-index:9999;pointer-events:none;max-width:240px;
+}
+.toast.show{transform:translateY(0);opacity:1;}
+.tv{font-weight:600;color:var(--accent);}
+
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-mark">GeoData</span>
+    <span class="logo-sub">Catalonia Explorer v4</span>
+  </div>
+  <div class="stack-pills">
+    <span class="pill on">PostGIS</span>
+    <span class="pill on">Leaflet</span>
+    <span class="pill on">OSM</span>
+    <span class="pill">QGIS</span>
+  </div>
+</header>
+
+<div class="main">
+<div class="sidebar">
+
+  <!-- ══════════════════════════════════════════════
+       ACTIVE FILTER CHIPS + RESET BUTTON
+       Shows one chip per active filter.
+       Chips are rebuilt by updateFilterBar().
+  ══════════════════════════════════════════════ -->
+  <div class="filter-bar" id="filterBar">
+    <span class="no-filters" id="noFilters">No filters active</span>
+    <button class="btn-reset" id="btnReset" onclick="resetAllFilters()" style="display:none">✕ Reset all</button>
+  </div>
+
+<div class="sb-scroll">
+
+  <!-- ══ 01 DATASET ══ -->
+  <div class="section">
+    <div class="sec-label">01 — Dataset
+      <span class="col-tag">P=city</span>
+      <span class="col-tag">B=gender</span>
+      <span class="col-tag">F/I=time</span>
+      <span class="col-tag">H=DEA</span>
+    </div>
+    <div class="upload-zone" id="dropzone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+        </svg>
+      </div>
+      <div class="upload-text"><strong>Upload dataset</strong><br>Excel or CSV</div>
+    </div>
+    <div id="fileStatus" style="display:none" class="file-loaded">
+      <div class="file-dot"></div><span id="fileStatusText"></span>
+    </div>
+    <button class="btn-sm" onclick="loadSampleData()">Load sample dataset</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       02 — GENDER FILTER  (column B)
+       Values: "Male" / "Female"
+       Filter state: genderFilter ∈ {'all','Male','Female'}
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="sec-label">02 — Gender <span class="col-tag">col B</span></div>
+    <div class="filter-group">
+      <button class="fbtn fbtn-all sel"    id="g-all"    onclick="setGender('all')">
+        <div class="fbtn-dot"></div>All
+      </button>
+      <button class="fbtn fbtn-male"       id="g-male"   onclick="setGender('Male')">
+        <div class="fbtn-dot"></div>Male
+      </button>
+      <button class="fbtn fbtn-female"     id="g-female" onclick="setGender('Female')">
+        <div class="fbtn-dot"></div>Female
+      </button>
+    </div>
+    <div class="sub-counts" id="genderCounts" style="display:none">
+      <div class="sc"><div class="sc-dot" style="background:var(--male)"></div><span id="scMale">—</span></div>
+      <div class="sc"><div class="sc-dot" style="background:var(--female)"></div><span id="scFemale">—</span></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       03 — RESPONSE TIME FILTER  (columns F and I)
+
+       HOW IT WORKS (JS):
+         col F = earlier timestamp  e.g. "2022-01-01 14:08:01"
+         col I = later timestamp    e.g. "2022-01-01 14:16:23"
+         diff  = parseTs(I) - parseTs(F)  → milliseconds
+         diffMinutes = diff / 60000
+
+         Under 8 min:  diffMinutes < 8
+         Over 8 min:   diffMinutes >= 8
+         Invalid rows (missing/negative diff) are excluded from
+         both buckets but still shown under "All".
+
+       PostGIS equivalent:
+         EXTRACT(EPOCH FROM (col_i::timestamp - col_f::timestamp))/60 < 8
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="sec-label">03 — Response Time <span class="col-tag">col F → I</span></div>
+    <div class="filter-group">
+      <button class="fbtn fbtn-time-all sel" id="t-all"  onclick="setTime('all')">
+        <div class="fbtn-dot"></div>All
+      </button>
+      <button class="fbtn fbtn-fast"         id="t-fast" onclick="setTime('fast')">
+        <div class="fbtn-dot"></div>&lt; 8 min
+      </button>
+      <button class="fbtn fbtn-slow"         id="t-slow" onclick="setTime('slow')">
+        <div class="fbtn-dot"></div>&ge; 8 min
+      </button>
+    </div>
+    <div class="sub-counts" id="timeCounts" style="display:none">
+      <div class="sc"><div class="sc-dot" style="background:var(--fast)"></div><span id="scFast">—</span></div>
+      <div class="sc"><div class="sc-dot" style="background:var(--slow)"></div><span id="scSlow">—</span></div>
+      <div class="sc"><div class="sc-dot" style="background:var(--muted)"></div><span id="scNoTime">—</span></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       04 — DEA FILTER  (column H)
+       Values in Excel: "Yes" / "No"  (case-insensitive)
+       Filter state: deaFilter ∈ {'all','Yes','No'}
+
+       PostGIS equivalent:
+         WHERE UPPER(col_h) = 'YES'
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="sec-label">04 — DEA Used <span class="col-tag">col H</span></div>
+    <div class="filter-group">
+      <button class="fbtn fbtn-dea-all sel" id="d-all" onclick="setDea('all')">
+        <div class="fbtn-dot"></div>All
+      </button>
+      <button class="fbtn fbtn-dea-y"       id="d-yes" onclick="setDea('Yes')">
+        <div class="fbtn-dot"></div>Yes
+      </button>
+      <button class="fbtn fbtn-dea-n"       id="d-no"  onclick="setDea('No')">
+        <div class="fbtn-dot"></div>No
+      </button>
+    </div>
+    <div class="sub-counts" id="deaCounts" style="display:none">
+      <div class="sc"><div class="sc-dot" style="background:var(--dea-y)"></div><span id="scDeaY">—</span></div>
+      <div class="sc"><div class="sc-dot" style="background:var(--dea-n)"></div><span id="scDeaN">—</span></div>
+    </div>
+  </div>
+
+  <!-- ══ 05 DOT SIZE ══ -->
+  <div class="section">
+    <div class="sec-label">05 — Dot Size</div>
+    <div class="size-row">
+      <span class="size-label">Min</span>
+      <input type="range" id="dotMin" min="4" max="14" value="6" oninput="onSizeChange()">
+      <span class="size-val" id="dotMinVal">6</span>
+    </div>
+    <div class="size-row" style="margin-bottom:0">
+      <span class="size-label">Max</span>
+      <input type="range" id="dotMax" min="14" max="54" value="30" oninput="onSizeChange()">
+      <span class="size-val" id="dotMaxVal">30</span>
+    </div>
+  </div>
+
+  <!-- ══ 06 RESULTS ══ -->
+  <div class="section" style="padding-bottom:6px">
+    <div class="sec-label">06 — Results <span class="col-tag" id="listLabel">—</span></div>
+  </div>
+  <div class="results-list" id="resultsList">
+    <div style="padding:24px 15px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7">
+      Upload a dataset to see results.
+    </div>
+  </div>
+
+</div><!-- /sb-scroll -->
+
+<div class="stats-bar" id="statsBar" style="display:none">
+  <div class="stat"><div class="stat-val" id="statRows">0</div><div class="stat-lab">Visible rows</div></div>
+  <div class="stat"><div class="stat-val" id="statCities">0</div><div class="stat-lab">Cities shown</div></div>
+  <div class="stat"><div class="stat-val" id="statMapped">0</div><div class="stat-lab">On map</div></div>
+</div>
+
+</div><!-- /sidebar -->
+<div id="map"></div>
+</div><!-- /main -->
+
+<div class="map-legend" id="mapLegend">
+  <div class="leg-title" id="legTitle">Frequency</div>
+  <div id="legRows"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- =====================================================================
+  JAVASCRIPT
+  Structure:
+    1. Constants & coordinate dictionary
+    2. Timestamp parser  (parseTs)
+    3. Map init
+    4. Filter state & setters  (setGender / setTime / setDea / resetAllFilters)
+    5. getFilteredRows  — applies all three stacked filters
+    6. buildFreq        — aggregates filtered rows into {city: {count, coords, …}}
+    7. renderMap        — clears markers, rebuilds from buildFreq result
+    8. updateFilterBar  — rebuilds the active-chip strip at top
+    9. afterLoad        — called after rawData is populated; computes sub-counts
+   10. parseFile / loadSampleData / file upload events
+   11. Toast helper
+===================================================================== -->
+<script>
+
+// ─────────────────────────────────────────────
+// 1. COORDINATE DICTIONARY  (OSM / Nominatim)
+// In production: replace lookupCoords() with
+//   fetch(`/api/geocode?name=${name}`)
+//   backed by PostGIS ST_Within + municipality table
+// ─────────────────────────────────────────────
+const CITY_COORDS = {
+  'barcelona':[41.3851,2.1734],'girona':[41.9794,2.8214],
+  'lleida':[41.6176,0.6200],'tarragona':[41.1181,1.2445],
+  'manresa':[41.7284,1.8234],'mataro':[41.5396,2.4453],
+  'sabadell':[41.5431,2.1095],'terrassa':[41.5634,2.0094],
+  'badalona':[41.4500,2.2470],'hospitalet de llobregat':[41.3596,2.1000],
+  'mollet del valles':[41.5370,2.2125],'molins de rei':[41.4129,2.0210],
+  'montcada i reixac':[41.4887,2.1867],'martorell':[41.4726,1.9318],
+  'masnou':[41.4792,2.3177],'malgrat de mar':[41.6475,2.7425],
+  'montgat':[41.4660,2.2806],'mollerussa':[41.6258,0.8930],
+  'montblanc':[41.3789,1.1592],'manlleu':[41.9813,2.2851],
+  'cambrils':[41.0657,1.0588],'reus':[41.1561,1.1065],
+  'valls':[41.2874,1.2529],'igualada':[41.5793,1.6169],
+  'vilanova i la geltru':[41.2244,1.7257],'vic':[41.9299,2.2548],
+  'berga':[41.9993,1.8431],'solsona':[41.9962,1.5162],
+  'tremp':[42.1673,0.8997],"la seu d'urgell":[42.3582,1.4583],
+  'puigcerda':[42.4319,1.9300],'ripoll':[42.2030,2.1932],
+  'olot':[42.1827,2.4907],'figueres':[42.2674,2.9625],
+  'blanes':[41.6735,2.7936],'lloret de mar':[41.6942,2.8416],
+  'roses':[42.2677,3.1770],'sitges':[41.2352,1.8096],
+  'premia de mar':[41.4929,2.3593],'pineda de mar':[41.6290,2.6814],
+  'sant feliu de guixols':[41.7826,3.0313],'palamos':[41.8478,3.1295],
+  "l'escala":[42.1238,3.1333],"mora d'ebre":[41.0900,0.6300],
+  'amposta':[40.7065,0.5811],'tortosa':[40.8120,0.5211],
+  'gandesa':[41.0536,0.4457],'palafrugell':[41.9072,3.1624],
+  'cardona':[41.9224,1.6798],'banyoles':[42.1185,2.7590],
+  'besalu':[42.2002,2.7001],'camprodon':[42.3185,2.3700],
+  'sallent':[41.8240,1.8914],'navas':[42.0461,1.8936],
+  'cornella de llobregat':[41.3550,2.0720],'viladecans':[41.3162,2.0201],
+  'gava':[41.3014,2.0038],'castelldefels':[41.2743,1.9766],
+  'sant boi de llobregat':[41.3472,2.0359],'el prat de llobregat':[41.3261,2.0956],
+  'vilafranca del penedes':[41.3437,1.7005],'el vendrell':[41.2177,1.5354],
+  'salou':[41.0718,1.1403],'tossa de mar':[41.7220,2.9358],
+  'santa coloma de farners':[41.8589,2.6737],"sant sadurni d'anoia":[41.4261,1.7862],
+  'calafell':[41.1939,1.5733],'palamós':[41.8478,3.1295],
+};
+
+function norm(s){
+  if(!s) return '';
+  return String(s).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ').trim();
+}
+function lookupCoords(name){
+  const n=norm(name);
+  if(CITY_COORDS[n]) return CITY_COORDS[n];
+  for(const [k,v] of Object.entries(CITY_COORDS))
+    if(k===n||k.startsWith(n)||n.startsWith(k)) return v;
+  return null;
+}
+
+// ─────────────────────────────────────────────
+// 2. TIMESTAMP PARSER
+// Handles: "2022-01-01 14:08:01"
+//          "2022-01-01T14:08:01"
+// Returns: milliseconds (Unix epoch) or null
+// ─────────────────────────────────────────────
+function parseTs(s){
+  if(!s) return null;
+  const str=String(s).trim().replace('T',' ');
+  const m=str.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+  if(!m) return null;
+  return Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]);
+}
+
+// ─────────────────────────────────────────────
+// 3. MAP INIT
+// ─────────────────────────────────────────────
+const map=L.map('map',{center:[41.7,1.7],zoom:8,zoomControl:true,attributionControl:false});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+const catPoly=[[42.848,0.72],[42.82,1.45],[42.75,1.75],[42.55,2.10],[42.45,2.65],[42.35,2.95],[42.18,3.10],[41.95,3.22],[41.70,3.15],[41.50,2.85],[41.35,2.65],[41.25,2.30],[41.10,1.90],[40.85,1.35],[40.70,0.85],[40.65,0.50],[40.72,0.30],[40.85,0.18],[41.10,0.15],[41.35,0.28],[41.55,0.42],[41.75,0.58],[41.95,0.65],[42.20,0.70],[42.50,0.72],[42.72,0.72]];
+L.polygon(catPoly,{stroke:true,color:'rgba(200,240,74,0.18)',weight:1.2,fillColor:'rgba(200,240,74,0.02)',fillOpacity:1}).addTo(map);
+
+// ─────────────────────────────────────────────
+// 4. FILTER STATE
+// ─────────────────────────────────────────────
+let rawData = [];
+let markers = [];
+
+// Each filter is independent — they stack via AND in getFilteredRows()
+let genderFilter = 'all';   // 'all' | 'Male' | 'Female'
+let timeFilter   = 'all';   // 'all' | 'fast' (<8min) | 'slow' (>=8min)
+let deaFilter    = 'all';   // 'all' | 'Yes' | 'No'
+
+// ── Dot color is driven by the combination of active filters
+// Priority: time > dea > gender (most visually distinctive first)
+function dotColor(){
+  if(timeFilter==='fast')   return {main:'#34d399', glow:'rgba(52,211,153,0.35)'};
+  if(timeFilter==='slow')   return {main:'#fb923c', glow:'rgba(251,146,60,0.35)'};
+  if(deaFilter==='Yes')     return {main:'#a78bfa', glow:'rgba(167,139,250,0.35)'};
+  if(deaFilter==='No')      return {main:'#94a3b8', glow:'rgba(148,163,184,0.28)'};
+  if(genderFilter==='Male') return {main:'#60a5fa', glow:'rgba(96,165,250,0.35)'};
+  if(genderFilter==='Female') return {main:'#f472b6', glow:'rgba(244,114,182,0.35)'};
+  return {main:'#c8f04a', glow:'rgba(200,240,74,0.35)'};
+}
+
+function setGender(v){
+  genderFilter=v;
+  ['all','male','female'].forEach(x=>document.getElementById('g-'+x).classList.remove('sel'));
+  document.getElementById('g-'+(v==='all'?'all':v.toLowerCase())).classList.add('sel');
+  updateFilterBar(); renderMap();
+}
+//takes in the value fast, all or slow and is stored in timefilter, this is mostly for updating the UI, but renfdermap also starts the processing
+function setTime(v){
+  timeFilter=v;
+  ['all','fast','slow'].forEach(x=>document.getElementById('t-'+x).classList.remove('sel'));
+  document.getElementById('t-'+v).classList.add('sel');
+  updateFilterBar(); renderMap();
+}
+function setDea(v){
+  deaFilter=v;
+  ['all','yes','no'].forEach(x=>document.getElementById('d-'+x).classList.remove('sel'));
+  document.getElementById('d-'+(v==='all'?'all':v.toLowerCase())).classList.add('sel');
+  updateFilterBar(); renderMap();
+}
+
+function resetAllFilters(){
+  setGender('all');
+  setTime('all');
+  setDea('all');
+  // setGender already calls renderMap; call it once more to be safe
+  renderMap();
+}
+
+// ─────────────────────────────────────────────
+// 5. FILTER APPLICATION — stacked AND logic
+//
+// PostGIS equivalent of all three active:
+//   WHERE (col_b = :gender OR :gender = 'all')
+//     AND (
+//           :time = 'all'
+//        OR (:time='fast' AND
+//            EXTRACT(EPOCH FROM (col_i::ts - col_f::ts))/60 < 8)
+//        OR (:time='slow' AND
+//            EXTRACT(EPOCH FROM (col_i::ts - col_f::ts))/60 >= 8)
+//         )
+//     AND (UPPER(col_h) = UPPER(:dea) OR :dea = 'all')
+// ─────────────────────────────────────────────
+function getFilteredRows(){
+  return rawData.filter(row=>{     //rawData.filter creates a new array, with only the rows that pass the condition, rows are checked one by one 
+    // ── Gender (col B) 
+    if(genderFilter!=='all'){
+      if(String(row.B||'').trim()!==genderFilter) return false;     //tar data fra row.B legger det i en streng og tar bort spacers, sjekker for hva gebderflter er satt til, dersom den ikke er "all"
+    }
+    // ── Response time (col F → col I)
+    if(timeFilter!=='all'){
+      const f=parseTs(row.F);    //this converts the time value to timestamps in milliseconds, the time is now stored in the variable F and I
+      const i=parseTs(row.I);
+      if(f===null||i===null) return false;        // skip rows with missing timestamps
+      const diffMin=(i-f)/60000;     //this hould give the diffrence between the timestamps from I and F in minutes 
+      if(diffMin<0) return false;                 // skip negative diffs (data error)
+      if(timeFilter==='fast' && diffMin>=8) return false;     //This should only keep values where the timefilter is fast ai. that the time diffrence is under 8 min
+      if(timeFilter==='slow' && diffMin<8)  return false;
+    }
+    // ── DEA (col H)
+    if(deaFilter!=='all'){
+      const h=String(row.H||'').trim().toLowerCase();
+      if(h!==deaFilter.toLowerCase()) return false;
+    }
+    return true;
+  });
+}
+
+// ─────────────────────────────────────────────
+// 6. BUILD FREQUENCY MAP from filtered rows, says the the rendermap function what rows should be there 
+// ─────────────────────────────────────────────
+function buildFreq(rows){
+  const freq={};    //crates a empty object when its filled up it will look somthing like { "barcelona": { count: 10, coords: [...], ... },  "madrid": { count: 5, coords: [...], ... } }
+  rows.forEach(row=>{     //loops through the rows 
+    const name=String(row.P||'').trim(); //extracts the name(municipality)
+    if(!name||name.length<2) return;    //checks if name is null or empty (!name) OR if the name has fewver than two characters 
+    const key=norm(name);     //converts into the normalised format
+
+    //denne er den som sorterer municiplaitiesene, den leter ikke rad for rad men grupperer dem, "koordinatene" er ikke funnet per rad men per navn
+    if(!freq[key]) freq[key]={count:0,displayName:name,coords:lookupCoords(name),male:0,female:0,fast:0,slow:0,deaY:0,deaN:0};
+    freq[key].count++;
+    // Breakdown counts for popup detail
+    const g=String(row.B||'').trim();
+    if(g==='Male')   freq[key].male++;
+    if(g==='Female') freq[key].female++;
+    const dea=String(row.H||'').trim().toLowerCase();
+    if(dea==='yes')  freq[key].deaY++;
+    if(dea==='no')   freq[key].deaN++;
+    const f=parseTs(row.F), ii=parseTs(row.I);
+    if(f!==null&&ii!==null&&(ii-f)>=0){     //herer det kanksje noe feil som gjør at tiden ikke teller riktig 
+      if((ii-f)/60000<8) freq[key].fast++;
+      else               freq[key].slow++;
+    }
+  });
+  return freq;
+}
+
+// ─────────────────────────────────────────────
+// 7. RENDER MAP
+// ─────────────────────────────────────────────
+function renderMap(){
+  markers.forEach(m=>map.removeLayer(m));
+  markers=[];
+
+  document.getElementById('dotMinVal').textContent=document.getElementById('dotMin').value;
+  document.getElementById('dotMaxVal').textContent=document.getElementById('dotMax').value;
+
+  const filtered=getFilteredRows();
+  const freq=buildFreq(filtered);
+  window.debugFreq = freq;
+  console.log(freq);
+  console.table(Object.values(freq));
+  const cities=Object.values(freq);
+
+  if(!cities.length){
+    document.getElementById('resultsList').innerHTML=
+      '<div style="padding:20px 15px;color:var(--muted);font-size:12px">No rows match the current filters.</div>';
+    document.getElementById('statsBar').style.display='none';
+    document.getElementById('mapLegend').style.display='none';
+    return;
+  }
+
+  const counts=cities.map(c=>c.count);
+  const maxCount=Math.max(...counts,1);
+  const minCount=Math.min(...counts,1);
+  const minPx=parseInt(document.getElementById('dotMin').value);
+  const maxPx=parseInt(document.getElementById('dotMax').value);
+  const col=dotColor();
+
+  // sqrt scaling so a city with 10x mentions doesn't get 10x the radius
+  function dotSz(n){
+    if(maxCount===minCount) return(minPx+maxPx)/2;
+    return minPx+Math.sqrt((n-minCount)/(maxCount-minCount))*(maxPx-minPx);
+  }
+
+  cities.forEach(city=>{
+    if(!city.coords) return;
+    const sz=dotSz(city.count);
+    const icon=L.divIcon({
+      html:`<div style="
+        width:${sz}px;height:${sz}px;
+        background:${col.main};
+        border-radius:50%;
+        border:1.5px solid rgba(0,0,0,0.4);
+        box-shadow:0 0 ${Math.round(sz*0.75)}px ${col.glow};
+        opacity:0.88;cursor:pointer;transition:transform 0.12s;
+      " onmouseover="this.style.transform='scale(1.22)';this.style.opacity='1'"
+         onmouseout="this.style.transform='';this.style.opacity='0.88'"></div>`,
+      className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
+    });
+    const m=L.marker(city.coords,{icon})
+      .addTo(map)
+      .bindPopup(`<div class="city-popup">
+        <h3 style="color:${col.main}">${city.displayName}</h3>
+        <p>
+          Total: <strong style="color:${col.main}">${city.count}</strong><br>
+          <span style="color:var(--male)">♂ ${city.male}</span>  <span style="color:var(--female)">♀ ${city.female}</span><br>
+          <span style="color:var(--fast)">⚡ &lt;8 min: ${city.fast}</span>  <span style="color:var(--slow)">🕐 ≥8 min: ${city.slow}</span><br>
+          <span style="color:var(--dea-y)">DEA yes: ${city.deaY}</span>  no: ${city.deaN}<br>
+          <span style="opacity:0.45">${city.coords[0].toFixed(4)}°N ${city.coords[1].toFixed(4)}°E</span>
+        </p>
+      </div>`,{closeButton:false});
+    markers.push(m);
+  });
+
+  // Sidebar list
+  const sorted=cities.sort((a,b)=>b.count-a.count);
+  const mapped=sorted.filter(c=>c.coords).length;
+  document.getElementById('statsBar').style.display='flex';
+  document.getElementById('statRows').textContent=filtered.length.toLocaleString();
+  document.getElementById('statCities').textContent=sorted.length;
+  document.getElementById('statMapped').textContent=mapped;
+  document.getElementById('listLabel').textContent=sorted.length+' cities';
+
+  document.getElementById('resultsList').innerHTML=sorted.map(c=>{
+    const sz=4+Math.round((c.count/maxCount)*10);
+    const pct=Math.round(c.count/maxCount*100);
+    return `<div class="result-item" onclick="flyTo(${JSON.stringify(c.coords)},'${c.displayName.replace(/'/g,"\\'")}',${c.count})">
+      <div class="r-dot-wrap"><div class="r-dot" style="width:${sz}px;height:${sz}px;background:${c.coords?col.main:'var(--border2)'}"></div></div>
+      <div class="r-name" ${!c.coords?'style="color:var(--muted)"':''}>${c.displayName}</div>
+      <div class="r-count">${c.count}×</div>
+      <div class="r-bar-wrap"><div class="r-bar" style="width:${pct}%;background:${col.main}"></div></div>
+    </div>`;
+  }).join('');
+
+  // Legend
+  const leg=document.getElementById('mapLegend');
+  const mid=sorted[Math.floor(sorted.length/2)];
+  leg.style.display='block';
+  const filterDesc=[
+    genderFilter!=='all'?genderFilter:'',
+    timeFilter==='fast'?'< 8 min':timeFilter==='slow'?'≥ 8 min':'',
+    deaFilter!=='all'?'DEA '+deaFilter:'',
+  ].filter(Boolean).join(' · ')||'All cases';
+  document.getElementById('legTitle').textContent=filterDesc;
+  document.getElementById('legRows').innerHTML=`
+    <div class="leg-row"><div class="leg-dot" style="width:${minPx}px;height:${minPx}px;background:${col.main}"></div><span>1 case</span></div>
+    ${mid?`<div class="leg-row"><div class="leg-dot" style="width:${Math.round((minPx+maxPx)/2)}px;height:${Math.round((minPx+maxPx)/2)}px;background:${col.main}"></div><span>${mid.count} cases</span></div>`:''}
+    <div class="leg-row"><div class="leg-dot" style="width:${maxPx}px;height:${maxPx}px;background:${col.main}"></div><span>${maxCount} cases</span></div>`;
+}
+
+function onSizeChange(){
+  document.getElementById('dotMinVal').textContent=document.getElementById('dotMin').value;
+  document.getElementById('dotMaxVal').textContent=document.getElementById('dotMax').value;
+  if(rawData.length) renderMap();
+}
+
+// ─────────────────────────────────────────────
+// 8. ACTIVE FILTER CHIPS BAR
+// ─────────────────────────────────────────────
+function updateFilterBar(){
+  const bar=document.getElementById('filterBar');
+  // Remove old chips (keep reset btn & no-filters span)
+  bar.querySelectorAll('.fchip').forEach(el=>el.remove());
+
+  const chips=[];
+  if(genderFilter!=='all'){
+    const cls=genderFilter==='Male'?'c-male':'c-female';
+    chips.push(`<span class="fchip ${cls}">
+      ${genderFilter}
+      <span class="chip-x" onclick="setGender('all')">×</span>
+    </span>`);
+  }
+  if(timeFilter!=='all'){
+    const cls=timeFilter==='fast'?'c-fast':'c-slow';
+    const lbl=timeFilter==='fast'?'< 8 min':'≥ 8 min';
+    chips.push(`<span class="fchip ${cls}">
+      ${lbl}
+      <span class="chip-x" onclick="setTime('all')">×</span>
+    </span>`);
+  }
+  if(deaFilter!=='all'){
+    const cls=deaFilter==='Yes'?'c-dea-y':'c-dea-n';
+    chips.push(`<span class="fchip ${cls}">
+      DEA ${deaFilter}
+      <span class="chip-x" onclick="setDea('all')">×</span>
+    </span>`);
+  }
+
+  const noF=document.getElementById('noFilters');
+  const btnR=document.getElementById('btnReset');
+
+  if(chips.length){
+    noF.style.display='none';
+    btnR.style.display='block';
+    // Insert chips before reset button
+    chips.forEach(h=>{
+      const div=document.createElement('div');
+      div.innerHTML=h;
+      bar.insertBefore(div.firstChild,btnR);
+    });
+  } else {
+    noF.style.display='';
+    btnR.style.display='none';
+  }
+}
+
+// ─────────────────────────────────────────────
+// 9. AFTER LOAD — compute breakdown counts
+//    shown as sub-counts under each filter group
+// ─────────────────────────────────────────────
+function afterLoad(){
+  if(!rawData.length) return;
+
+  // Gender counts (over full dataset)
+  let male=0,female=0;
+  rawData.forEach(r=>{
+    const g=String(r.B||'').trim();
+    if(g==='Male') male++;
+    if(g==='Female') female++;
+  });
+  document.getElementById('scMale').textContent=male.toLocaleString()+' male';
+  document.getElementById('scFemale').textContent=female.toLocaleString()+' female';
+  document.getElementById('genderCounts').style.display='flex';
+
+  // Response time counts
+  let fast=0,slow=0,noTime=0;
+  rawData.forEach(r=>{
+    const f=parseTs(r.F), i=parseTs(r.I);
+    if(f===null||i===null||i-f<0){ noTime++; return; }
+    const m=(i-f)/60000;
+    if(m<8) fast++; else slow++;
+  });
+  document.getElementById('scFast').textContent=fast.toLocaleString()+' under 8 min';
+  document.getElementById('scSlow').textContent=slow.toLocaleString()+' 8 min or over';
+  document.getElementById('scNoTime').textContent=noTime.toLocaleString()+' no timestamp';
+  document.getElementById('timeCounts').style.display='flex';
+
+  // DEA counts
+  let deaY=0,deaN=0;
+  rawData.forEach(r=>{
+    const h=String(r.H||'').trim().toLowerCase();
+    if(h==='yes') deaY++;
+    if(h==='no')  deaN++;
+  });
+  document.getElementById('scDeaY').textContent=deaY.toLocaleString()+' yes';
+  document.getElementById('scDeaN').textContent=deaN.toLocaleString()+' no';
+  document.getElementById('deaCounts').style.display='flex';
+
+  renderMap();
+}
+
+// ─────────────────────────────────────────────
+// 10. FILE PARSING
+// ─────────────────────────────────────────────
+function parseFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(!rows.length){ toast('File appears empty.'); return; }
+
+      const header=rows[0];
+      // Map each column index to its Excel letter (A, B, …, Z, AA, …)
+      const colLetters=header.map((_,i)=>{
+        const n=i+1;
+        return n<=26
+          ? String.fromCharCode(64+n)
+          : String.fromCharCode(64+Math.floor((n-1)/26))
+            +String.fromCharCode(64+((n-1)%26)+1);
+      });
+
+      rawData=rows.slice(1).map(row=>{
+        const obj={};
+        row.forEach((val,i)=>{ obj[colLetters[i]]=val; });
+        return obj;
+      });
+
+      document.getElementById('fileStatus').style.display='flex';
+      document.getElementById('fileStatusText').textContent=
+        `${rawData.length.toLocaleString()} rows · ${header.length} cols · ${file.name}`;
+
+      toast(`Loaded <span class="tv">${rawData.length.toLocaleString()}</span> rows`);
+      afterLoad();
+    }catch(err){
+      toast('Error: '+err.message);
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+// File upload events
+const dz=document.getElementById('dropzone');
+document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0]) parseFile(e.target.files[0]);});
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0]) parseFile(e.dataTransfer.files[0]);});
+
+// ─────────────────────────────────────────────
+// SAMPLE DATA GENERATOR
+// Produces 5 000 rows with realistic values for
+// columns B (gender), F (start ts), I (end ts),
+// H (DEA yes/no), P (municipality)
+// ─────────────────────────────────────────────
+function loadSampleData(){
+  const cities=['Barcelona','Barcelona','Barcelona','Barcelona','Barcelona','Barcelona','Barcelona',
+    'Girona','Girona','Girona','Lleida','Lleida','Lleida','Tarragona','Tarragona','Tarragona','Tarragona',
+    'Manresa','Manresa','Mataró','Mataró','Mataró','Sabadell','Sabadell','Terrassa','Terrassa','Terrassa',
+    'Badalona','Badalona','Reus','Reus','Reus','Cambrils','Vic','Vic','Figueres','Figueres',
+    'Olot','Blanes','Blanes','Sitges','Sitges','Sitges','Vilanova i la Geltrú','Vilanova i la Geltrú',
+    'Igualada','Berga','Ripoll','Mollet del Vallès','Mollet del Vallès','Amposta','Tortosa','Tortosa',
+    'Valls','Mollerussa','Puigcerdà','Tremp','Solsona','Cardona','Palafrugell','Palamós',
+    'Tossa de Mar','Lloret de Mar','Roses','Premià de Mar','Pineda de Mar','Viladecans','Gavà',
+    'Castelldefels','Cornellà de Llobregat','Martorell','Masnou','Manlleu','Sallent','Banyoles',
+    "La Seu d'Urgell",'Camprodon','Molins de Rei',
+  ];
+  const startMs=new Date('2022-01-01').getTime();
+  const endMs  =new Date('2023-12-31').getTime();
+
+  function fmtTs(ms){
+    const d=new Date(ms);
+    return d.toISOString().slice(0,10)+' '
+      +String(d.getUTCHours()).padStart(2,'0')+':'
+      +String(d.getUTCMinutes()).padStart(2,'0')+':'
+      +String(d.getUTCSeconds()).padStart(2,'0');
+  }
+
+  rawData=Array.from({length:5000},(_,i)=>{
+    const city   =cities[i%cities.length];
+    const gender =Math.random()>0.47?'Male':'Female';
+    // start time somewhere in 2022-2023
+    const fMs    =startMs+Math.random()*(endMs-startMs);
+    // response time: weighted towards 3–15 min; 35% chance of being under 8 min
+    const diffMin=Math.random()<0.35
+      ? 1+Math.random()*6.9          // 1–7.9 min (fast)
+      : 8+Math.random()*22;          // 8–30 min  (slow)
+    const iMs    =fMs+diffMin*60000;
+    const dea    =Math.random()<0.25?'Yes':'No';  // 25% DEA use
+    return {
+      A:i+1, B:gender,
+      F:fmtTs(fMs), I:fmtTs(iMs),
+      H:dea, P:city,
+    };
+  });
+
+  document.getElementById('fileStatus').style.display='flex';
+  document.getElementById('fileStatusText').textContent='5 000 rows · sample dataset';
+  toast(`Loaded <span class="tv">5 000</span> sample rows`);
+  afterLoad();
+}
+
+// ── Fly to city on list click
+function flyTo(coords,name,count){
+  if(!coords){ toast(`<span class="tv">${name}</span> — not on map`); return; }
+  map.setView(coords,13,{animate:true});
+  toast(`<span class="tv">${name}</span> — ${count} case${count>1?'s':''}`);
+}
+
+// ── Toast
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.innerHTML=msg; t.classList.add('show');
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('show'),3500);
+}
+</script>
+</body>       
+</html>
