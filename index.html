@@ -1014,6 +1014,38 @@ function loadSampleData(){
   afterLoad();
 }
 
+// ── SANITARY REGIONS — list all your GeoJSON files here
+const SANITARY_REGIONS = [
+  { file: 'terres_ebre.geojson', color: '#e63946', name: "Terres de l'Ebre" },
+  // add more files here as you get them:
+  // { file: 'barcelona.geojson', color: '#457b9d', name: 'Barcelona' },
+];
+
+let regionLayers = [];
+
+function switchRegion(mode) {
+  // Remove all existing region layers
+  regionLayers.forEach(l => map.removeLayer(l));
+  regionLayers = [];
+
+  if (mode === 'none') return;
+
+  if (mode === 'health') {
+    SANITARY_REGIONS.forEach(region => {
+      fetch(region.file)
+        .then(r => r.json())
+        .then(gj => {
+          const layer = L.geoJSON(gj, {
+            style: { color: region.color, weight: 1.5, fillOpacity: 0.07 },
+            onEachFeature: (f, l) => l.bindPopup(f.properties.name || region.name)
+          }).addTo(map);
+          regionLayers.push(layer);
+        })
+        .catch(() => toast('Could not load: ' + region.file));
+    });
+  }
+}
+
 // ── Fly to city on list click
 function flyTo(coords,name,count){
   if(!coords){ toast(`<span class="tv">${name}</span> — not on map`); return; }
