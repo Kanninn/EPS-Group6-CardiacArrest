@@ -523,6 +523,7 @@ function lookupCoords(name){
 //          "2022-01-01T14:08:01"
 // Returns: milliseconds (Unix epoch) or null
 // ─────────────────────────────────────────────
+/*
 function parseTs(s){
   if(!s) return null;
   const str=String(s).trim().replace('T',' ');
@@ -530,7 +531,16 @@ function parseTs(s){
   if(!m) return null;
   return Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]);
 }
+*/
+function parseTs(s){
+  if(!s) return null;
 
+  const d = new Date(s);
+
+  if(isNaN(d.getTime())) return null;
+
+  return d.getTime();
+}
 // ─────────────────────────────────────────────
 // 3. MAP INIT
 // ─────────────────────────────────────────────
@@ -633,7 +643,7 @@ function getFilteredRows(){
 // 6. BUILD FREQUENCY MAP from filtered rows, says the the rendermap function what rows should be there 
 // ─────────────────────────────────────────────
 function buildFreq(rows){
-  const freq={};    //crates a empty object when its filled up it will look somthing like { "barcelona": { count: 10, coords: [...], ... },  "madrid": { count: 5, coords: [...], ... } }
+  const freq={};   //crates a empty object when its filled up it will look somthing like { "barcelona": { count: 10, coords: [...], ... },  "madrid": { count: 5, coords: [...], ... } }
   rows.forEach(row=>{     //loops through the rows 
     const name=String(row.P||'').trim(); //extracts the name(municipality)
     if(!name||name.length<2) return;    //checks if name is null or empty (!name) OR if the name has fewver than two characters 
@@ -649,10 +659,49 @@ function buildFreq(rows){
     const dea=String(row.H||'').trim().toLowerCase();
     if(dea==='yes')  freq[key].deaY++;
     if(dea==='no')   freq[key].deaN++;
+    /*
     const f=parseTs(row.F), ii=parseTs(row.I);
     if(f!==null&&ii!==null&&(ii-f)>=0){     //herer det kanksje noe feil som gjør at tiden ikke teller riktig 
       if((ii-f)/60000<8) freq[key].fast++;
       else               freq[key].slow++;
+    }*/
+    const f = parseTs(row.F);
+    const ii = parseTs(row.I);
+
+    console.log({
+      rawF: row.F,
+      rawI: row.I,
+      parsedF: f,
+      parsedI: ii,
+      diff: ii - f
+    });
+
+    if(f === null) {
+      console.log('F NULL');
+    }
+
+    if(ii === null) {
+      console.log('I NULL');
+    }
+
+    if(f !== null && ii !== null && (ii - f) < 0) {
+      console.log('NEGATIVE DIFF');
+    }
+
+    if(f !== null && ii !== null && (ii - f) >= 0){
+
+      const mins = (ii - f)/60000;
+
+      console.log('VALID DIFF', mins);
+
+      if(mins < 8) {
+        freq[key].fast++;
+        console.log('FAST++');
+      }
+      else {
+        freq[key].slow++;
+        console.log('SLOW++');
+      }
     }
   });
   return freq;
@@ -670,6 +719,7 @@ function renderMap(){
 
   const filtered=getFilteredRows();
   const freq=buildFreq(filtered);
+  window.debugFiltered = filtered;
   window.debugFreq = freq;
   console.log(freq);
   console.table(Object.values(freq));
