@@ -1042,7 +1042,23 @@ function switchRegion(mode) {
 
   if (mode === 'none') return;
 
-  if (mode === 'health') {
+  if (mode === 'health') 
+
+  if (mode === 'comarques') {
+  fetch('comarques.geojson')
+    .then(r => r.json())
+    .then(gj => {
+      const layer = L.geoJSON(gj, {
+        style: { color: '#60a5fa', weight: 1.5, fillOpacity: 0.06 },
+        onEachFeature: (f, l) => l.bindPopup(f.properties.name || f.properties.NAME || 'Comarca')
+      }).addTo(map);
+      regionLayers.push(layer);
+    })
+    .catch(() => toast('Could not load comarques.geojson'));
+  }
+  
+  {
+
     SANITARY_REGIONS.forEach(region => {
       fetch(region.file)
         .then(r => r.json())
