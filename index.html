@@ -164,6 +164,12 @@ header{
 .fbtn-dea-y.sel  {border-color:var(--dea-y); background:var(--dea-y-bg);      color:var(--dea-y);}
 .fbtn-dea-n.sel  {border-color:var(--dea-n); background:var(--dea-n-bg);      color:var(--dea-n);}
 
+/* Year dropdown hover/focus state */
+#yearSelect:hover { border-color: var(--border2); }
+#yearSelect:focus { border-color: var(--accent); }
+/* Option elements inherit surface colour in most browsers */
+#yearSelect option { background: var(--surface2); color: var(--text); }
+
 /* sub-count row */
 .sub-counts{display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;}
 .sc{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px;}
@@ -382,7 +388,40 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
     </div>
   </div>
 
-  <!-- ══ 07 REGIONS Endre her det er ikke 7 lenger ══ -->
+
+  <!-- ══ 05 YEAR FILTER — col F ══
+      Dropdown is populated dynamically by populateYearDropdown()
+      after data loads. Before data is loaded it just shows "All years".
+      Sits between DEA and Dot Size in the sidebar. -->
+  <div class="section">
+    <div class="sec-label">05 — Year <span class="col-tag">col F</span></div>
+    <select id="yearSelect" onchange="setYear(this.value)" style="
+      width:100%;
+      background:var(--surface2);
+      border:1px solid var(--border2);
+      border-radius:7px;
+      padding:8px 10px;
+      font-family:'DM Mono',monospace;
+      font-size:11px;
+      color:var(--text);
+      cursor:pointer;
+      outline:none;
+      appearance:none;
+      -webkit-appearance:none;
+      background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%226%22 viewBox=%220 0 10 6%22><path d=%22M0 0l5 6 5-6z%22 fill=%22%237a7870%22/></svg>');
+      background-repeat:no-repeat;
+      background-position:right 10px center;
+    ">
+      <option value="all">All years</option>
+      <!-- options are injected by populateYearDropdown() -->
+    </select>
+    <div id="yearCount" style="
+      font-family:'DM Mono',monospace;font-size:10px;
+      color:var(--muted);margin-top:6px;display:none;
+    "></div>
+  </div>
+
+  <!-- ══ 06 REGIONS (Endre her det er ikke 7 lenger) ══ -->
   <div class="section">
   <div class="sec-label">07 — Regions</div>
 
@@ -399,7 +438,7 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
   </button>
   </div>
 
-  <!-- ══ 05 DOT SIZE ══ -->
+  <!-- ══ 07 DOT SIZE ══ -->
   <div class="section">
     <div class="sec-label">05 — Dot Size</div>
     <div class="size-row">
@@ -414,7 +453,7 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
     </div>
   </div>
 
-  <!-- ══ 06 RESULTS ══ -->
+  <!-- ══ 08 RESULTS ══ -->
   <div class="section" style="padding-bottom:6px">
     <div class="sec-label">06 — Results <span class="col-tag" id="listLabel">—</span></div>
   </div>
@@ -562,6 +601,8 @@ L.polygon(catPoly,{stroke:true,color:'rgba(200,240,74,0.18)',weight:1.2,fillColo
 let rawData = [];
 let markers = [];
 
+let yearFilter = 'all';   // 'all' | '2022' | '2023' | etc from collumn F
+
 // Each filter is independent — they stack via AND in getFilteredRows()
 let genderFilter = 'all';   // 'all' | 'Male' | 'Female'
 let timeFilter   = 'all';   // 'all' | 'fast' (<8min) | 'slow' (>=8min)
@@ -599,10 +640,52 @@ function setDea(v){
   updateFilterBar(); renderMap();
 }
 
+// --------------------------------------------------------setYear: stores the selected year and re-renders the map.
+// Called by the dropdown's onchange.
+function setYear(v) {
+  yearFilter = v;
+  updateFilterBar();
+  renderMap();
+}
+
+// populateYearDropdown: reads all unique years from col F using parseTs,
+// sorts them, and injects <option> elements into the dropdown.
+// Called once from afterLoad() after rawData is populated.
+// This is why we reuse parseTs — it already handles the full timestamp
+// format "2022-01-01 14:08:01" and returns ms; we just grab getUTCFullYear().
+function populateYearDropdown() {
+  const years = new Set();
+  rawData.forEach(r => {
+    const ms = parseTs(r.F);
+    if (ms !== null) years.add(new Date(ms).getUTCFullYear());
+  });
+
+  const select = document.getElementById('yearSelect');
+  // Remove all options except the first "All years"
+  while (select.options.length > 1) select.remove(1);
+
+  // Add one option per unique year, sorted ascending
+  Array.from(years).sort().forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = String(y);
+    opt.textContent = String(y);
+    select.appendChild(opt);
+  });
+
+  // Show count hint
+  const countEl = document.getElementById('yearCount');
+  if (years.size > 0) {
+    countEl.textContent = years.size + ' year' + (years.size > 1 ? 's' : '') + ' in dataset';
+    countEl.style.display = 'block';
+  }
+}
+
+//---------------------------------------------------------------------
 function resetAllFilters(){
   setGender('all');
   setTime('all');
   setDea('all');
+  document.getElementById('yearSelect').value = 'all';    // ← and this
   // setGender already calls renderMap; call it once more to be safe
   renderMap();
 }
@@ -641,6 +724,14 @@ function getFilteredRows(){
     if(deaFilter!=='all'){
       const h=String(row.H||'').trim().toLowerCase();
       if(h!==deaFilter.toLowerCase()) return false;
+    }
+    // ── Year filter (col F)
+    // Extracts year from the same full timestamp parseTs already handles.
+    // ms / getUTCFullYear avoids any local timezone offset on the year boundary.
+    if (yearFilter !== 'all') {   //guard for starting condition, if the year filter is set to all we dont need to check the year of each row, but if its set to a specific year we need to check the year of each row and only return true for the rows that match the selected year
+      const ms = parseTs(row.F);
+      if (ms === null) return false;
+      if (String(new Date(ms).getUTCFullYear()) !== yearFilter) return false;
     }
     return true;
   });
@@ -856,6 +947,12 @@ function updateFilterBar(){
       <span class="chip-x" onclick="setDea('all')">×</span>
     </span>`);
   }
+  if (yearFilter !== 'all') {
+  chips.push(`<span class="fchip" style="border-color:var(--accent);color:var(--accent);background:rgba(200,240,74,0.08)">
+    ${yearFilter}
+    <span class="chip-x" onclick="setYear('all');document.getElementById('yearSelect').value='all'">×</span>
+  </span>`);
+  }
 
   const noF=document.getElementById('noFilters');
   const btnR=document.getElementById('btnReset');
@@ -917,6 +1014,8 @@ function afterLoad(){
   document.getElementById('scDeaN').textContent=deaN.toLocaleString()+' no';
   document.getElementById('deaCounts').style.display='flex';
 
+
+  populateYearDropdown();  // build year dropdown from col F timestamps
   renderMap();
 }
 
