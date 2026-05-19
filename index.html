@@ -438,6 +438,11 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
   </button>
   </div>
 
+  <button class="btn-sm" id="btnHeatmap" onclick="toggleHeatmap()">
+  Heatmap mode: OFF
+</button>
+
+
   <!-- ══ 07 DOT SIZE ══ -->
   <div class="section">
     <div class="sec-label">05 — Dot Size</div>
@@ -600,6 +605,7 @@ L.polygon(catPoly,{stroke:true,color:'rgba(200,240,74,0.18)',weight:1.2,fillColo
 // ─────────────────────────────────────────────
 let rawData = [];
 let markers = [];
+let heatLayer = [];
 
 let yearFilter = 'all';   // 'all' | '2022' | '2023' | etc from collumn F
 
@@ -607,6 +613,26 @@ let yearFilter = 'all';   // 'all' | '2022' | '2023' | etc from collumn F
 let genderFilter = 'all';   // 'all' | 'Male' | 'Female'
 let timeFilter   = 'all';   // 'all' | 'fast' (<8min) | 'slow' (>=8min)
 let deaFilter    = 'all';   // 'all' | 'Yes' | 'No'
+
+let displayMode = 'dots'; // 'dots' | 'heatmap'
+
+// Converts a 0–1 ratio to a red choropleth color
+function choroColor(ratio) {
+  // Light pink → deep crimson
+  const stops = [
+    [252, 235, 235],  // ~0  (lightest)
+    [240, 149, 149],  // ~0.25
+    [226,  75,  75],  // ~0.5
+    [163,  45,  45],  // ~0.75
+    [ 80,  19,  19],  // ~1  (darkest)
+  ];
+  const i = Math.min(ratio * (stops.length - 1), stops.length - 1.001);
+  const lo = stops[Math.floor(i)], hi = stops[Math.ceil(i)], t = i % 1;
+  const r = Math.round(lo[0] + (hi[0]-lo[0])*t);
+  const g = Math.round(lo[1] + (hi[1]-lo[1])*t);
+  const b = Math.round(lo[2] + (hi[2]-lo[2])*t);
+  return `rgb(${r},${g},${b})`;
+}
 
 // ── Dot color is driven by the combination of active filters
 // Priority: time > dea > gender (most visually distinctive first)
@@ -819,8 +845,6 @@ function renderMap(){
   const freq=buildFreq(filtered);
   window.debugFiltered = filtered;
   window.debugFreq = freq;
-  console.log(freq);
-  console.table(Object.values(freq));
   const cities=Object.values(freq);
 
   if(!cities.length){
@@ -838,43 +862,48 @@ function renderMap(){
   const maxPx=parseInt(document.getElementById('dotMax').value);
   const col=dotColor();
 
-  // sqrt scaling so a city with 10x mentions doesn't get 10x the radius
-  function dotSz(n){
-    if(maxCount===minCount) return(minPx+maxPx)/2;
-    return minPx+Math.sqrt((n-minCount)/(maxCount-minCount))*(maxPx-minPx);
+  // ── HEATMAP MODE: color the loaded region polygons instead of drawing dots
+  if(displayMode==='heatmap' && regionLayers.length>0){
+    renderHeatmap(freq, maxCount);
+  } else {
+    // ── DOT MODE: existing dot rendering
+    function dotSz(n){
+      if(maxCount===minCount) return(minPx+maxPx)/2;
+      return minPx+Math.sqrt((n-minCount)/(maxCount-minCount))*(maxPx-minPx);
+    }
+
+    cities.forEach(city=>{
+      if(!city.coords) return;
+      const sz=dotSz(city.count);
+      const icon=L.divIcon({
+        html:`<div style="
+          width:${sz}px;height:${sz}px;
+          background:${col.main};
+          border-radius:50%;
+          border:1.5px solid rgba(0,0,0,0.4);
+          box-shadow:0 0 ${Math.round(sz*0.75)}px ${col.glow};
+          opacity:0.88;cursor:pointer;transition:transform 0.12s;
+        " onmouseover="this.style.transform='scale(1.22)';this.style.opacity='1'"
+           onmouseout="this.style.transform='';this.style.opacity='0.88'"></div>`,
+        className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
+      });
+      const m=L.marker(city.coords,{icon})
+        .addTo(map)
+        .bindPopup(`<div class="city-popup">
+          <h3 style="color:${col.main}">${city.displayName}</h3>
+          <p>
+            Total: <strong style="color:${col.main}">${city.count}</strong><br>
+            <span style="color:var(--male)">♂ ${city.male}</span>  <span style="color:var(--female)">♀ ${city.female}</span><br>
+            <span style="color:var(--fast)">⚡ &lt;8 min: ${city.fast}</span>  <span style="color:var(--slow)">🕐 ≥8 min: ${city.slow}</span><br>
+            <span style="color:var(--dea-y)">DEA yes: ${city.deaY}</span>  no: ${city.deaN}<br>
+            <span style="opacity:0.45">${city.coords[0].toFixed(4)}°N ${city.coords[1].toFixed(4)}°E</span>
+          </p>
+        </div>`,{closeButton:false});
+      markers.push(m);
+    });
   }
 
-  cities.forEach(city=>{
-    if(!city.coords) return;
-    const sz=dotSz(city.count);
-    const icon=L.divIcon({
-      html:`<div style="
-        width:${sz}px;height:${sz}px;
-        background:${col.main};
-        border-radius:50%;
-        border:1.5px solid rgba(0,0,0,0.4);
-        box-shadow:0 0 ${Math.round(sz*0.75)}px ${col.glow};
-        opacity:0.88;cursor:pointer;transition:transform 0.12s;
-      " onmouseover="this.style.transform='scale(1.22)';this.style.opacity='1'"
-         onmouseout="this.style.transform='';this.style.opacity='0.88'"></div>`,
-      className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
-    });
-    const m=L.marker(city.coords,{icon})
-      .addTo(map)
-      .bindPopup(`<div class="city-popup">
-        <h3 style="color:${col.main}">${city.displayName}</h3>
-        <p>
-          Total: <strong style="color:${col.main}">${city.count}</strong><br>
-          <span style="color:var(--male)">♂ ${city.male}</span>  <span style="color:var(--female)">♀ ${city.female}</span><br>
-          <span style="color:var(--fast)">⚡ &lt;8 min: ${city.fast}</span>  <span style="color:var(--slow)">🕐 ≥8 min: ${city.slow}</span><br>
-          <span style="color:var(--dea-y)">DEA yes: ${city.deaY}</span>  no: ${city.deaN}<br>
-          <span style="opacity:0.45">${city.coords[0].toFixed(4)}°N ${city.coords[1].toFixed(4)}°E</span>
-        </p>
-      </div>`,{closeButton:false});
-    markers.push(m);
-  });
-
-  // Sidebar list
+  // ── Sidebar list (same in both modes)
   const sorted=cities.sort((a,b)=>b.count-a.count);
   const mapped=sorted.filter(c=>c.coords).length;
   document.getElementById('statsBar').style.display='flex';
@@ -886,34 +915,111 @@ function renderMap(){
   document.getElementById('resultsList').innerHTML=sorted.map(c=>{
     const sz=4+Math.round((c.count/maxCount)*10);
     const pct=Math.round(c.count/maxCount*100);
+    const dotColor2=displayMode==='heatmap'?choroColor(c.count/maxCount):col.main;
     return `<div class="result-item" onclick="flyTo(${JSON.stringify(c.coords)},'${c.displayName.replace(/'/g,"\\'")}',${c.count})">
-      <div class="r-dot-wrap"><div class="r-dot" style="width:${sz}px;height:${sz}px;background:${c.coords?col.main:'var(--border2)'}"></div></div>
+      <div class="r-dot-wrap"><div class="r-dot" style="width:${sz}px;height:${sz}px;background:${dotColor2}"></div></div>
       <div class="r-name" ${!c.coords?'style="color:var(--muted)"':''}>${c.displayName}</div>
       <div class="r-count">${c.count}×</div>
-      <div class="r-bar-wrap"><div class="r-bar" style="width:${pct}%;background:${col.main}"></div></div>
+      <div class="r-bar-wrap"><div class="r-bar" style="width:${pct}%;background:${dotColor2}"></div></div>
     </div>`;
   }).join('');
 
-  // Legend
+  // ── Legend
   const leg=document.getElementById('mapLegend');
-  const mid=sorted[Math.floor(sorted.length/2)];
   leg.style.display='block';
   const filterDesc=[
     genderFilter!=='all'?genderFilter:'',
     timeFilter==='fast'?'< 8 min':timeFilter==='slow'?'≥ 8 min':'',
     deaFilter!=='all'?'DEA '+deaFilter:'',
+    yearFilter!=='all'?yearFilter:'',
   ].filter(Boolean).join(' · ')||'All cases';
   document.getElementById('legTitle').textContent=filterDesc;
-  document.getElementById('legRows').innerHTML=`
-    <div class="leg-row"><div class="leg-dot" style="width:${minPx}px;height:${minPx}px;background:${col.main}"></div><span>1 case</span></div>
-    ${mid?`<div class="leg-row"><div class="leg-dot" style="width:${Math.round((minPx+maxPx)/2)}px;height:${Math.round((minPx+maxPx)/2)}px;background:${col.main}"></div><span>${mid.count} cases</span></div>`:''}
-    <div class="leg-row"><div class="leg-dot" style="width:${maxPx}px;height:${maxPx}px;background:${col.main}"></div><span>${maxCount} cases</span></div>`;
+
+  if(displayMode==='heatmap'){
+    // Gradient legend for heatmap
+    document.getElementById('legRows').innerHTML=`
+      <div style="width:120px;height:10px;border-radius:4px;background:linear-gradient(to right,rgb(252,235,235),rgb(226,75,75),rgb(80,19,19));margin-bottom:4px"></div>
+      <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted)">
+        <span>0</span><span>${maxCount} cases</span>
+      </div>`;
+  } else {
+    const mid=sorted[Math.floor(sorted.length/2)];
+    document.getElementById('legRows').innerHTML=`
+      <div class="leg-row"><div class="leg-dot" style="width:${minPx}px;height:${minPx}px;background:${col.main}"></div><span>1 case</span></div>
+      ${mid?`<div class="leg-row"><div class="leg-dot" style="width:${Math.round((minPx+maxPx)/2)}px;height:${Math.round((minPx+maxPx)/2)}px;background:${col.main}"></div><span>${mid.count} cases</span></div>`:''}
+      <div class="leg-row"><div class="leg-dot" style="width:${maxPx}px;height:${maxPx}px;background:${col.main}"></div><span>${maxCount} cases</span></div>`;
+  }
 }
+
+
+function renderHeatmap(freq, maxCount){
+  regionLayers.forEach(regionLayer=>{
+    if(!regionLayer.eachLayer) return;
+    regionLayer.eachLayer(featureLayer=>{
+      const props = featureLayer.feature && featureLayer.feature.properties;
+      if(!props) return;
+
+      // Try all common GeoJSON name fields your files might use
+      const rawName = props.NOM || props.nom || props.NAME || props.name || props.NOMCOMAR || '';
+      const key = norm(rawName);
+
+      // Sum counts for all freq entries whose key starts with or matches this polygon name
+      // This handles both exact matches (comarques) and partial matches
+      let total = 0, male = 0, female = 0, fast = 0, slow = 0, deaY = 0, deaN = 0;
+      Object.entries(freq).forEach(([k, v]) => {
+        if(k === key || k.startsWith(key) || key.startsWith(k)){
+          total += v.count;
+          male  += v.male;   female += v.female;
+          fast  += v.fast;   slow   += v.slow;
+          deaY  += v.deaY;   deaN   += v.deaN;
+        }
+      });
+
+      const ratio = maxCount > 0 ? Math.min(total / maxCount, 1) : 0;
+
+      featureLayer.setStyle({
+        fillColor:   total > 0 ? choroColor(ratio) : 'transparent',
+        fillOpacity: total > 0 ? 0.75 : 0.04,
+        color:       '#501313',
+        weight:      1.5,
+        opacity:     0.6,
+      });
+
+      featureLayer.bindPopup(
+        `<div class="city-popup">
+          <h3 style="color:${choroColor(ratio)}">${rawName || 'Region'}</h3>
+          <p>
+            Total: <strong style="color:${choroColor(ratio)}">${total}</strong><br>
+            <span style="color:var(--male)">♂ ${male}</span>  <span style="color:var(--female)">♀ ${female}</span><br>
+            <span style="color:var(--fast)">⚡ &lt;8 min: ${fast}</span>  <span style="color:var(--slow)">🕐 ≥8 min: ${slow}</span><br>
+            <span style="color:var(--dea-y)">DEA yes: ${deaY}</span>  no: ${deaN}
+          </p>
+        </div>`,
+        {closeButton:false}
+      );
+    });
+  });
+}
+
+
 
 function onSizeChange(){
   document.getElementById('dotMinVal').textContent=document.getElementById('dotMin').value;
   document.getElementById('dotMaxVal').textContent=document.getElementById('dotMax').value;
   if(rawData.length) renderMap();
+}
+
+function toggleHeatmap(){
+  displayMode = displayMode === 'dots' ? 'heatmap' : 'dots';
+  const btn = document.getElementById('btnHeatmap');
+  const on  = displayMode === 'heatmap';
+  btn.textContent      = 'Heatmap mode: ' + (on ? 'ON' : 'OFF');
+  btn.style.borderColor = on ? '#e24b4a' : 'var(--border2)';
+  btn.style.color       = on ? '#e24b4a' : 'var(--muted)';
+  if(on && regionLayers.length === 0){
+    toast('Load a region first (Health Regions or Comarques)');
+  }
+  renderMap();
 }
 
 // ─────────────────────────────────────────────
@@ -1135,44 +1241,49 @@ const SANITARY_REGIONS = [
 let regionLayers = [];
 
 function switchRegion(mode) {
-  // Remove all existing region layers
   regionLayers.forEach(l => map.removeLayer(l));
   regionLayers = [];
 
-  if (mode === 'none') return;
-
-  if (mode === 'health') 
+  if (mode === 'none') {
+    renderMap();
+    return;
+  }
 
   if (mode === 'comarques') {
-  fetch('comarques.geojson')
-    .then(r => r.json())
-    .then(gj => {
-      const layer = L.geoJSON(gj, {
-        style: { color: '#60a5fa', weight: 1.5, fillOpacity: 0.06 },
-        onEachFeature: (f, l) => l.bindPopup(f.properties.name || f.properties.NAME || 'Comarca')
-      }).addTo(map);
-      regionLayers.push(layer);
-    })
-    .catch(() => toast('Could not load comarques.geojson'));
+    fetch('comarques-compressed.geojson')
+      .then(r => r.json())
+      .then(gj => {
+        const layer = L.geoJSON(gj, {
+          style: { color: '#60a5fa', weight: 1.5, fillColor: '#60a5fa', fillOpacity: 0.08 },
+          onEachFeature: (f, l) =>
+            l.bindPopup(f.properties.NOM || f.properties.name || f.properties.NAME || 'Comarca')
+        }).addTo(map);
+        regionLayers.push(layer);
+        renderMap();  // ← called AFTER layer is loaded
+      })
+      .catch(() => toast('Could not load comarques.geojson'));
+    return;
   }
-  
-  {
 
+  if (mode === 'health') {
+    let loaded = 0;
     SANITARY_REGIONS.forEach(region => {
       fetch(region.file)
         .then(r => r.json())
         .then(gj => {
           const layer = L.geoJSON(gj, {
-            style: { color: region.color, weight: 1.5, fillOpacity: 0.07 },
-            onEachFeature: (f, l) => l.bindPopup(f.properties.name || region.name)
+            style: { color: region.color, weight: 1.5, fillColor: region.color, fillOpacity: 0.08 },
+            onEachFeature: (f, l) =>
+              l.bindPopup(f.properties.name || f.properties.NAME || region.name)
           }).addTo(map);
           regionLayers.push(layer);
+          loaded++;
+          if (loaded === SANITARY_REGIONS.length) renderMap();  // ← after ALL files loaded
         })
         .catch(() => toast('Could not load: ' + region.file));
     });
   }
 }
-
 
 
 // ── Fly to city on list click
