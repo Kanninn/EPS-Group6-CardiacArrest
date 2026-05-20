@@ -1226,18 +1226,6 @@ function loadSampleData(){
   afterLoad();
 }
 
-// ── SANITARY REGIONS — list all your GeoJSON files here
-
-const SANITARY_REGIONS = [
-  { file: 'terres_ebre.geojson',       color: '#e63946', name: "Terres de l'Ebre" },
-  { file: 'barcelona.geojson',          color: '#457b9d', name: 'Barcelona' },
-  { file: 'girona.geojson',             color: '#2a9d8f', name: 'Girona' },
-  { file: 'lleida.geojson',             color: '#e9c46a', name: 'Lleida' },
-  { file: 'camp_de_tarragona.geojson',  color: '#f4a261', name: 'Camp de Tarragona' },
-  { file: 'catalunya_central.geojson',  color: '#a78bfa', name: 'Catalunya Central' },
-  { file: 'alt_pirineu_i_aran.geojson', color: '#34d399', name: 'Alt Pirineu i Aran' },
-];
-
 let regionLayers = [];
 
 function switchRegion(mode) {
@@ -1265,23 +1253,34 @@ function switchRegion(mode) {
     return;
   }
 
+  
   if (mode === 'health') {
-    let loaded = 0;
-    SANITARY_REGIONS.forEach(region => {
-      fetch(region.file)
-        .then(r => r.json())
-        .then(gj => {
-          const layer = L.geoJSON(gj, {
-            style: { color: region.color, weight: 1.5, fillColor: region.color, fillOpacity: 0.08 },
-            onEachFeature: (f, l) =>
-              l.bindPopup(f.properties.name || f.properties.NAME || region.name)
-          }).addTo(map);
-          regionLayers.push(layer);
-          loaded++;
-          if (loaded === SANITARY_REGIONS.length) renderMap();  // ← after ALL files loaded
-        })
-        .catch(() => toast('Could not load: ' + region.file));
-    });
+  // Single file contains all 7 health regions as separate features.
+  // Property NOMRS = region name, e.g. "Regió Sanitària Girona"
+  // Property CODIRS = region code
+  fetch('RegionsS_2018_2021.geojson')     //fetcher 
+    .then(r => r.json())
+    .then(gj => {
+      const layer = L.geoJSON(gj, {
+        style: {
+          color: '#c8f04a',
+          weight: 1.5,
+          fillColor: '#c8f04a',
+          fillOpacity: 0.06,
+        },
+        onEachFeature: (f, l) => {
+          const name = f.properties.NOMRS || f.properties.CODIRS || 'Regió';
+          l.bindTooltip(name, { sticky: true, direction: 'top' });
+          l.bindPopup(`<div class="city-popup"><h3 style="color:#c8f04a">${name}</h3></div>`, { closeButton: false });
+          l.on('mouseover', () => l.setStyle({ fillOpacity: 0.15, weight: 2 }));
+          l.on('mouseout',  () => layer.resetStyle(l));
+        }
+      }).addTo(map);
+      regionLayers.push(layer);
+      layer.bringToBack();
+      renderMap();
+    })
+    .catch(err => toast('Could not load RegionsS_2018_2021.geojson — ' + err.message));
   }
 }
 
