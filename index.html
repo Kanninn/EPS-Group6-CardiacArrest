@@ -952,34 +952,34 @@ function renderMap(){
 }
 
 
-function renderHeatmap(freq, maxCount){
-  regionLayers.forEach(regionLayer=>{
-    if(!regionLayer.eachLayer) return;
-    regionLayer.eachLayer(featureLayer=>{
+function renderHeatmap(freq, maxCount) {
+  regionLayers.forEach(regionLayer => {
+    if (!regionLayer.eachLayer) return;
+    regionLayer.eachLayer(featureLayer => {
       const props = featureLayer.feature && featureLayer.feature.properties;
-      if(!props) return;
+      if (!props) return;
 
-      // Try all common GeoJSON name fields your files might use
-      const rawName = props.NOM || props.nom || props.NAME || props.name || props.NOMCOMAR || '';
-      const key = norm(rawName);
+      const rawName = props.nom_comar || props.NOM || props.nom || props.NAME || props.name || '';
 
-      // Sum counts for all freq entries whose key starts with or matches this polygon name
-      // This handles both exact matches (comarques) and partial matches
+      // Instead of matching by name, check which cities fall INSIDE this polygon
       let total = 0, male = 0, female = 0, fast = 0, slow = 0, deaY = 0, deaN = 0;
-      Object.entries(freq).forEach(([k, v]) => {
-        if(k === key || k.startsWith(key) || key.startsWith(k)){
-          total += v.count;
-          male  += v.male;   female += v.female;
-          fast  += v.fast;   slow   += v.slow;
-          deaY  += v.deaY;   deaN   += v.deaN;
+
+      Object.values(freq).forEach(city => {
+        if (!city.coords) return;
+        const latLng = L.latLng(city.coords[0], city.coords[1]);
+        if (isPointInLayer(latLng, featureLayer)) {
+          total  += city.count;
+          male   += city.male;   female += city.female;
+          fast   += city.fast;   slow   += city.slow;
+          deaY   += city.deaY;   deaN   += city.deaN;
         }
       });
 
       const ratio = maxCount > 0 ? Math.min(total / maxCount, 1) : 0;
 
       featureLayer.setStyle({
-        fillColor:   total > 0 ? choroColor(ratio) : 'transparent',
-        fillOpacity: total > 0 ? 0.75 : 0.04,
+        fillColor:   total > 0 ? choroColor(ratio) : '#1a1a1a',
+        fillOpacity: total > 0 ? 0.75 : 0.15,
         color:       '#501313',
         weight:      1.5,
         opacity:     0.6,
@@ -995,12 +995,46 @@ function renderHeatmap(freq, maxCount){
             <span style="color:var(--dea-y)">DEA yes: ${deaY}</span>  no: ${deaN}
           </p>
         </div>`,
-        {closeButton:false}
+        { closeButton: false }
       );
     });
   });
 }
 
+// Checks if a LatLng point falls inside a GeoJSON feature layer
+function isPointInLayer(latLng, layer) {
+  try {
+    const bounds = layer.getBounds();
+    if (!bounds.contains(latLng)) return false;
+    const geojson = layer.toGeoJSON();
+    return isPointInGeoJSON(latLng, geojson.geometry);
+  } catch(e) { return false; }
+}
+
+function isPointInGeoJSON(latLng, geometry) {
+  const pt = [latLng.lng, latLng.lat];
+  if (geometry.type === 'Polygon') {
+    return pointInPolygon(pt, geometry.coordinates[0]);
+  }
+  if (geometry.type === 'MultiPolygon') {
+    return geometry.coordinates.some(poly => pointInPolygon(pt, poly[0]));
+  }
+  return false;
+}
+
+// Ray casting algorithm — standard point-in-polygon check
+function pointInPolygon(point, polygon) {
+  const x = point[0], y = point[1];
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    const intersect = ((yi > y) !== (yj > y)) &&
+      (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
 
 
 function onSizeChange(){
