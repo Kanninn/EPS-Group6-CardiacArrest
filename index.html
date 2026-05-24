@@ -209,7 +209,7 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 
 /* ── Map ── */
 #map{flex:1;background:#0a0a0a;}
-.leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(0.48) contrast(1.1);}
+.leaflet-tile-pane{filter:none;}
 .leaflet-control-zoom{border:1px solid var(--border2)!important;background:var(--surface)!important;}
 .leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border2)!important;}
 .leaflet-control-zoom a:hover{background:var(--surface2)!important;color:var(--accent)!important;}
@@ -596,10 +596,9 @@ function parseTs(s){
 // 3. MAP INIT
 // ─────────────────────────────────────────────
 const map=L.map('map',{center:[41.7,1.7],zoom:8,zoomControl:true,attributionControl:false});
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
 const catPoly=[[42.848,0.72],[42.82,1.45],[42.75,1.75],[42.55,2.10],[42.45,2.65],[42.35,2.95],[42.18,3.10],[41.95,3.22],[41.70,3.15],[41.50,2.85],[41.35,2.65],[41.25,2.30],[41.10,1.90],[40.85,1.35],[40.70,0.85],[40.65,0.50],[40.72,0.30],[40.85,0.18],[41.10,0.15],[41.35,0.28],[41.55,0.42],[41.75,0.58],[41.95,0.65],[42.20,0.70],[42.50,0.72],[42.72,0.72]];
-L.polygon(catPoly,{stroke:true,color:'rgba(200,240,74,0.18)',weight:1.2,fillColor:'rgba(200,240,74,0.02)',fillOpacity:1}).addTo(map);
-
+L.polygon(catPoly,{stroke:false,fillColor:'rgba(26,92,138,0.02)',fillOpacity:1}).addTo(map);
 // ─────────────────────────────────────────────
 // 4. FILTER STATE
 // ─────────────────────────────────────────────
