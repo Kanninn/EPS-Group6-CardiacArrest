@@ -861,11 +861,19 @@ function renderMap(){
   const maxPx=parseInt(document.getElementById('dotMax').value);
   const col=dotColor();
 
-  // ── HEATMAP MODE: color the loaded region polygons instead of drawing dots
+
   if(displayMode==='heatmap' && regionLayers.length>0){
     renderHeatmap(freq, maxCount);
   } else {
-    // ── DOT MODE: existing dot rendering
+    // ← Reset region polygons to default style when heatmap is OFF
+    regionLayers.forEach(regionLayer => {
+      if (!regionLayer.eachLayer) return;
+      regionLayer.eachLayer(featureLayer => {
+        regionLayer.resetStyle(featureLayer);
+        featureLayer.unbindPopup();
+      });
+    });
+
     function dotSz(n){
       if(maxCount===minCount) return(minPx+maxPx)/2;
       return minPx+Math.sqrt((n-minCount)/(maxCount-minCount))*(maxPx-minPx);
