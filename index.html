@@ -1311,9 +1311,7 @@ function switchRegion(mode) {
         onEachFeature: (f, l) => {
           const name = f.properties.NOMRS || f.properties.CODIRS || 'Regió';
           l.bindTooltip(name, { sticky: true, direction: 'top' });
-          l.bindPopup(`<div class="city-popup"><h3 style="color:#c8f04a">${name}</h3></div>`, { closeButton: false });
-          l.on('mouseover', () => l.setStyle({ fillOpacity: 0.15, weight: 2 }));
-          l.on('mouseout',  () => layer.resetStyle(l));
+          l.bindPopup(`<div class="city-popup"><h3 style="color:var(--accent)">${name}</h3></div>`, { closeButton: false });
         }
       }).addTo(map);
       regionLayers.push(layer);
