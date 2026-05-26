@@ -10,6 +10,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="municipality_codes_Working.js"></script>
+
 
 <!-- =====================================================================
   COLUMN REFERENCE (fixed — matches your Excel):
@@ -553,12 +555,22 @@ function norm(s){
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .replace(/\s+/g,' ').trim();
 }
+
+//lookes up by name, this is a fallback for when the codes dont work
 function lookupCoords(name){
   const n=norm(name);
   if(CITY_COORDS[n]) return CITY_COORDS[n];
   for(const [k,v] of Object.entries(CITY_COORDS))
     if(k===n||k.startsWith(n)||n.startsWith(k)) return v;
   return null;
+}
+
+// Looks up coordinates by INE municipality code from column S.
+// Pads to 6 digits first to handle both "80193" and "080193" formats.
+function lookupByCode(code) {
+  if (!code) return null;
+  const key = String(parseInt(String(code).trim(), 10)).padStart(6, '0');
+  return MUNICIPALITY_CODES[key] || null;
 }
 
 // ─────────────────────────────────────────────
@@ -773,7 +785,7 @@ function buildFreq(rows){
     const key=norm(name);     //converts into the normalised format
 
     //denne er den som sorterer municiplaitiesene, den leter ikke rad for rad men grupperer dem, "koordinatene" er ikke funnet per rad men per navn
-    if(!freq[key]) freq[key]={count:0,displayName:name,coords:lookupCoords(name),male:0,female:0,fast:0,slow:0,deaY:0,deaN:0};
+    if(!freq[key]) freq[key]={count:0,displayName:name,coords: lookupByCode(row.S) || lookupCoords(name),male:0,female:0,fast:0,slow:0,deaY:0,deaN:0};
     freq[key].count++;
     // Breakdown counts for popup detail
     const g=String(row.B||'').trim();
