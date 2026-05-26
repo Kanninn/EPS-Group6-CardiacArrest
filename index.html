@@ -994,8 +994,7 @@ function renderHeatmap(freq, maxCount) {
 
       featureLayer.bindPopup(
         `<div class="city-popup">
-          <h3 style="color:${choroColor(ratio)}">${rawName || 'Region'}</h3>
-          <p>
+          <h3 style="color:${total > 0 ? '#1a5c8a' : 'var(--muted)'}">${rawName || 'Region'}</h3>
             Total: <strong style="color:${choroColor(ratio)}">${total}</strong><br>
             <span style="color:var(--male)">♂ ${male}</span>  <span style="color:var(--female)">♀ ${female}</span><br>
             <span style="color:var(--fast)">⚡ &lt;8 min: ${fast}</span>  <span style="color:var(--slow)">🕐 ≥8 min: ${slow}</span><br>
