@@ -288,6 +288,7 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
       <span class="col-tag">H=DEA</span>
     </div>
     <div class="upload-zone" id="dropzone">
+      <label for="fileInput">Upload dataset</label>
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
       <div class="upload-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -339,9 +340,6 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
          Over 8 min:   diffMinutes >= 8
          Invalid rows (missing/negative diff) are excluded from
          both buckets but still shown under "All".
-
-       PostGIS equivalent:
-         EXTRACT(EPOCH FROM (col_i::timestamp - col_f::timestamp))/60 < 8
   ══════════════════════════════════════════════ -->
   <div class="section">
     <div class="sec-label">03 — Response Time <span class="col-tag">col F → I</span></div>
@@ -397,6 +395,7 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
       Sits between DEA and Dot Size in the sidebar. -->
   <div class="section">
     <div class="sec-label">05 — Year <span class="col-tag">col F</span></div>
+    <label for="yearSelect">Year</label>
     <select id="yearSelect" onchange="setYear(this.value)" style="
       width:100%;
       background:var(--surface2);
@@ -450,11 +449,13 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
     <div class="sec-label">05 — Dot Size</div>
     <div class="size-row">
       <span class="size-label">Min</span>
+      <label for="dotMin">Minimum dot size</label> 
       <input type="range" id="dotMin" min="4" max="14" value="6" oninput="onSizeChange()">
       <span class="size-val" id="dotMinVal">6</span>
     </div>
     <div class="size-row" style="margin-bottom:0">
       <span class="size-label">Max</span>
+      <label for="dotMax">Maximum dot size</label>
       <input type="range" id="dotMax" min="14" max="54" value="30" oninput="onSizeChange()">
       <span class="size-val" id="dotMaxVal">30</span>
     </div>
@@ -579,15 +580,8 @@ function lookupByCode(code) {
 //          "2022-01-01T14:08:01"
 // Returns: milliseconds (Unix epoch) or null
 // ─────────────────────────────────────────────
-/*
-function parseTs(s){
-  if(!s) return null;
-  const str=String(s).trim().replace('T',' ');
-  const m=str.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
-  if(!m) return null;
-  return Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]);
-}
-*/
+
+//VERY importent ->
 //Now this works because of that excel stores dates as excel serialnumbers and the y need to be read out correctly (days since 1899, with decimal for time of day)
 function parseTs(s){
   if(s === null || s === undefined || s === '') return null;
@@ -605,7 +599,7 @@ function parseTs(s){
   return d.getTime();
 }
 // ─────────────────────────────────────────────
-// 3. MAP INIT
+// 3. MAP INIT /just sets the map
 // ─────────────────────────────────────────────
 const map=L.map('map',{center:[41.7,1.7],zoom:8,zoomControl:true,attributionControl:false});
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
